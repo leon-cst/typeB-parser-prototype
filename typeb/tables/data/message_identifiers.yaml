@@ -1,0 +1,301 @@
+# Message identifier table -- REQ03__GDSTTY_BOOKING_MESSAGES_REQUIREMNTV2.pdf,
+# section 5 "MESSAGE IDENTIFIER ELEMENT", pages 7-8.
+#
+# Per spec: line 3 of a message is checked against this table. If it's a
+# known 3-char code, that's the message type. If not, and line 4 starts
+# with a digit (max 3 digits), the message is a booking/passenger-list
+# message -- there is no wire-transmitted identifier for that case, so
+# "BOOKING" below is a synthetic pseudo-identifier for internal dispatch
+# only, not a real Type B code.
+#
+# `meta.supported: true` marks the messages this parser currently handles.
+# Everything else is deliberately loaded (so the table is complete and
+# ready for expansion) but not yet parsed -- see typeb_parser_handoff.md
+# section 4, "explicitly out of scope for now".
+
+entries:
+  # --- 1. RESERVATION ------------------------------------------------
+  - code: AVS
+    category: reservation
+    description: Availability status request
+    meta:
+      has_record_locator: false  # REQ02 p.2-5: every worked AVS example goes from identifier straight into segment status body lines
+      source_note: >
+        REQ03 describes AVS as a status *request*. REQ02's worked examples
+        (AVS-AVN requirement doc) instead show AVS used for status
+        responses/advisories, with a separate identifier "RAS" introduced
+        as the actual request message. These two source documents
+        contradict each other on what AVS means -- confirm real usage
+        with the spec author before implementing AVS handling.
+  - code: AVA
+    category: reservation
+    description: Availability answer
+    meta:
+      has_record_locator: false  # REQ02 p.10-11: identifier line goes straight into RBD-by-compartment body, no record locator observed
+  - code: AVN
+    category: reservation
+    description: Availability numeric
+    meta:
+      has_record_locator: false  # REQ02 p.7-8: identifier line goes straight into segment/class body lines, no record locator observed in any worked example
+      supported: true
+  - code: RQR
+    category: reservation
+    description: Request for reply information
+    meta:
+      has_record_locator: true  # REQ03 p.76: example has a record locator line immediately after the identifier
+      source_note: >
+        Listed twice in the source table with slightly different wording
+        ("Request for Replay information" on p.7, "Request reply" on p.8).
+        Treated as one code here.
+  - code: RQA
+    category: reservation
+    description: Request answer
+  - code: AIR
+    category: reservation
+    description: Air reservation request
+  - code: RRA
+    category: reservation
+    description: Reservation reply booking request
+  - code: AAK
+    category: reservation
+    description: Reply from member for block create, increase, decrease, or update request
+  - code: AKD
+    category: reservation
+    description: Advising the decrease of an existing block (bilateral)
+  - code: AKI
+    category: reservation
+    description: Advising the increase of an existing block (bilateral)
+  - code: AKK
+    category: reservation
+    description: Advising creation of a block allocation (member initiated)
+  - code: AKU
+    category: reservation
+    description: Advising the update of a block allocation (member initiated)
+  - code: ASA
+    category: reservation
+    description: Advising block allocation reaccommodation to an alternative flight
+  - code: ASC
+    category: reservation
+    description: Advice of schedule change
+    meta:
+      has_record_locator: true  # REQ03 p.98-100: every ASC example has a record locator line immediately after the identifier
+  - code: AVC
+    category: reservation
+    description: Car availability status
+  - code: AVH
+    category: reservation
+    description: Hotel availability status
+  - code: AVT
+    category: reservation
+    description: Tour availability status
+  - code: BPR
+    category: reservation
+    description: Pre-reserve seat and boarding pass (bilateral)
+    meta:
+      has_record_locator: true  # REQ03 p.62: example shows TWO record locator lines (primary + secondary) before the name element
+  - code: CHG
+    category: reservation
+    description: Message directed to hotel operator indicating a change
+  - code: CRA
+    category: reservation
+    description: Request for creation of block allocation
+  - code: DEC
+    category: reservation
+    description: Request for a decrease in block size (bilateral)
+  - code: DVD
+    category: reservation
+    description: Divide PNR
+    meta:
+      has_record_locator: true  # REQ03 p.63-97: every DVD example has a record locator line immediately after the identifier
+  - code: INC
+    category: reservation
+    description: Request for an increase in block size (bilateral)
+  - code: IRP
+    category: reservation
+    description: Request seats in irregular operation
+  - code: MAS
+    category: reservation
+    description: Availability specific status (numeric availability option-2)
+    meta:
+      has_record_locator: false  # REQ02 p.9: identifier line goes straight into segment/RBD body, no record locator observed
+  - code: MED
+    category: reservation
+    description: Reservation request requiring medical clearance
+  - code: NAC
+    category: reservation
+    description: No action taken
+  - code: NAR
+    category: reservation
+    description: New arrival information
+  - code: NCO
+    category: reservation
+    description: New continuation information
+  - code: NRC
+    category: reservation
+    description: No record passenger
+  - code: NRL
+    category: reservation
+    description: Advice of new record locator change for PNRs
+  - code: RVR
+    category: reservation
+    description: Availability status recap request
+    meta:
+      has_record_locator: false  # REQ03 p.13: identifier line goes straight into flight/date-range body, no record locator observed
+      supported: true
+  - code: SKD
+    category: reservation
+    description: Schedule change data message
+  - code: UPD
+    category: reservation
+    description: Request for an update of block parameters (bilateral)
+  - code: TLR
+    category: reservation
+    description: Record locator advised (PNR-code confirmation reply)
+    meta:
+      has_record_locator: true  # REQ03 p.75: example has a record locator line immediately after the identifier
+  - code: RAS
+    category: reservation
+    description: Request for availability status (AVS)
+    meta:
+      has_record_locator: false  # REQ02 p.18: identifier line goes straight into airline/flight/date/segment body
+      source_note: >
+        Introduced in REQ02 (AVS-AVN requirement doc, "RAS - MESSAGE
+        REQUEST FOR AVS"), but absent from REQ03's own identifier table.
+        Included here for completeness; flagged as an inconsistency
+        between the two source documents.
+  - code: AVR
+    category: reservation
+    description: Availability recap response (all RBD, all compartment, for a flight date or date range)
+    meta:
+      has_record_locator: false  # REQ02 p.14: identifier line goes straight into segment/RBD body, no record locator observed
+      source_note: >
+        Same gap as RAS above: introduced in REQ02 ("AVR - RECAP
+        RESPONSE") but absent from REQ03's own identifier table.
+
+  # --- 2. PASSENGER LIST ---------------------------------------------
+  - code: PNL
+    category: passenger_list
+    description: Passenger Name List
+  - code: ADL
+    category: passenger_list
+    description: PNL Addition & Deletion List
+  - code: RCL
+    category: passenger_list
+    description: Reconciliation List
+  - code: LDM
+    category: passenger_list
+    description: Load message (aircraft)
+  - code: PSM
+    category: passenger_list
+    description: Passenger service message
+
+  # --- 3. OPERATION MESSAGES ------------------------------------------
+  - code: MVT
+    category: operations
+    description: Movement message
+  - code: DIV
+    category: operations
+    description: Diversion message (flight)
+  - code: ARR
+    category: operations
+    description: Arrival message
+  - code: DEP
+    category: operations
+    description: Departure message information
+
+  # --- 4. SCHEDULE MESSAGES (AIRIMP/SSIM) ------------------------------
+  - code: SSM
+    category: schedule
+    description: Schedule change message
+  - code: ASM
+    category: schedule
+    description: Ad-hoc schedule message
+  - code: SCR
+    category: schedule
+    description: Slot clearance request
+  - code: SIR
+    category: schedule
+    description: Slot information reply
+
+  # --- 5. CARGO MESSAGES -----------------------------------------------
+  - code: FWB
+    category: cargo
+    description: Air waybill data
+  - code: FHL
+    category: cargo
+    description: House manifest / house shipment list
+  - code: FFM
+    category: cargo
+    description: Flight manifest (cargo)
+  - code: FSU
+    category: cargo
+    description: Flight status update (cargo)
+
+  # --- 6. AIRPORT / GROUND HANDLING MESSAGES ---------------------------
+  - code: PTM
+    category: ground_handling
+    description: Passenger transfer message
+  - code: PFS
+    category: ground_handling
+    description: Passenger final sales
+  - code: PAL
+    category: ground_handling
+    description: Passenger assistance list
+  - code: PRL
+    category: ground_handling
+    description: Passenger reservation list
+
+  # --- 7. SECURITY / GOVERNMENT MESSAGES --------------------------------
+  - code: APIS
+    category: security_government
+    description: Advance Passenger Information
+    meta:
+      source_note: >
+        4 characters, not 3 -- inconsistent with the spec's general rule
+        that message identifiers are 3 characters (REQ03 section 5).
+  - code: PNRGOV
+    category: security_government
+    description: Passenger Information Government
+    meta:
+      source_note: 6 characters -- same 3-character inconsistency as APIS.
+
+  # --- 8. MESSAGE FOR COMMUNICATION USE ---------------------------------
+  - code: COR
+    category: communication
+    description: Correction to previous message
+  - code: PDM
+    category: communication
+    description: Possible duplicate message
+
+  # --- 9. MESSAGE FOR PTA USE --------------------------------------------
+  - code: ACK
+    category: pta
+    description: Acknowledgement message
+  - code: ADC
+    category: pta
+    description: Addition collection message
+  - code: ADV
+    category: pta
+    description: Reply to further information
+  - code: PRF
+    category: pta
+    description: Partial refund or over-collection message
+  - code: RFD
+    category: pta
+    description: Full refund message
+  - code: RFI
+    category: pta
+    description: Request for further information or action
+
+  # --- Internal pseudo-identifier (not a wire code) ---------------------
+  - code: BOOKING
+    category: internal
+    description: >
+      Synthetic dispatch label. Per REQ03 section 5: if line 3 is not a
+      known 3-char identifier and line 4 starts with a digit (number in
+      party, max 3 digits), the message is a passenger booking/name-list
+      message. There is no transmitted identifier for this case.
+    meta:
+      has_record_locator: true  # inherent to this pseudo-type: no identifier line means the record locator IS the next line, always
+      supported: true
+      synthetic: true

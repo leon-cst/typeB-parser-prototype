@@ -1,0 +1,14 @@
+# Office function designator codes -- the 2-char middle segment of every
+# Address (city_code + office_code + airline/CRS designator).
+# REQ03 section 2 (p.4) and section 6 "Communication Reference Element" (p.6).
+
+entries:
+  - code: RI
+    category: office_function
+    description: Availability message (AVS/AVN/etc.)
+  - code: RM
+    category: office_function
+    description: Passenger reservation (or bilateral agreement)
+  - code: RP
+    category: office_function
+    description: Prepaid ticket advice

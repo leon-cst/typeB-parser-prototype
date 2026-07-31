@@ -1,0 +1,42 @@
+# Auxiliary service element codes -- REQ03 section 10, pages 15-16.
+# Not needed for AVN/RVR/booking-hold scope yet, but loaded now so the
+# table is complete and the element layer can add HTL/CAR/etc. support
+# later without a new table.
+
+entries:
+  - code: ATX
+    category: auxiliary_service
+    description: Air taxi
+  - code: CAR
+    category: auxiliary_service
+    description: Car rental
+    meta:
+      source_note: >
+        Source document lists both CAR and CCR as "Car rental" with no
+        stated distinction between them. Verify with author.
+  - code: CCR
+    category: auxiliary_service
+    description: Car rental
+    meta:
+      source_note: Same as CAR above -- no stated distinction in the source document.
+  - code: HTL
+    category: auxiliary_service
+    description: Hotel accommodation
+    meta:
+      source_note: >
+        Source document lists both HTL and HHL as "Hotel accommodation"
+        with no stated distinction between them. Verify with author.
+  - code: HHL
+    category: auxiliary_service
+    description: Hotel accommodation
+    meta:
+      source_note: Same as HTL above -- no stated distinction in the source document.
+  - code: SUR
+    category: auxiliary_service
+    description: Surface transport (ship, rail, bus, etc.)
+  - code: SVC
+    category: auxiliary_service
+    description: Additional services, not associated with a segment
+  - code: TUR
+    category: auxiliary_service
+    description: Tour (sightseeing, etc.)

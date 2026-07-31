@@ -1,0 +1,26 @@
+# OSI contact-information type codes -- REQ03 section 13, page 23.
+# Used when sending contact info to another airline via OSI, e.g.
+# "OSI GA 1BAMBANG/MR E/BAMBANG@GMAIL.COM" (E = email).
+
+entries:
+  - code: A
+    category: osi_contact
+    description: Address (home and hotel)
+  - code: B
+    category: osi_contact
+    description: Business telephone
+  - code: E
+    category: osi_contact
+    description: Email
+  - code: F
+    category: osi_contact
+    description: Fax
+  - code: H
+    category: osi_contact
+    description: Home telephone
+  - code: M
+    category: osi_contact
+    description: Mobile phone
+  - code: T
+    category: osi_contact
+    description: Travel agent telephone

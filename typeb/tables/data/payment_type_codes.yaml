@@ -1,0 +1,19 @@
+# Valid payment type codes -- REQ03 section 18 area ("passive segment"
+# ticketing rules), page 45.
+
+entries:
+  - code: AP
+    category: payment
+    description: Account payment
+  - code: AC
+    category: payment
+    description: Airline card
+  - code: CC
+    category: payment
+    description: Credit card
+  - code: CP
+    category: payment
+    description: Coupon payment
+  - code: VP
+    category: payment
+    description: Voucher payment

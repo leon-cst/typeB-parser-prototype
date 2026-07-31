@@ -1,0 +1,188 @@
+# Segment status / booking action codes -- PNR_STATUS_CODE_docx.pdf.
+#
+# The source document groups these under headings (1. booking confirm,
+# 2. waitlist/pending, 3. unable/cancel, 4. schedule change, 5. airport
+# check-in, 6. group booking status, 7. passive/information segment) and
+# a separate "booking action code" list. Several codes are listed under
+# more than one heading in the source -- those are flagged with
+# meta.source_note rather than duplicated as separate rows (see loader.py
+# docstring for why).
+
+entries:
+  # --- 1. Booking confirm ---------------------------------------------
+  - code: HK
+    category: booking_confirm
+    description: Holding, confirmed
+  - code: KK
+    category: booking_confirm
+    description: Confirmed from waitlist, action required
+  - code: KI
+    category: booking_confirm
+    description: Confirmed from waitlist, with advice
+    meta:
+      source_note: >
+        Source document renders this as "Kl" (lowercase L). Almost
+        certainly an OCR artifact for "KI" -- no other 2-letter code in
+        the table uses a lowercase-L-shaped second character. Verify with
+        the spec author before relying on this code.
+  - code: TK
+    category: booking_confirm
+    description: Confirmed due to time change, action required
+    meta:
+      source_note: >
+        Source document also lists TK under "status code due to schedule
+        change" as "Time change notification". Same code, likely
+        context-dependent (booking confirmation vs. schedule-change
+        advisory flow) -- matches how REQ03 section 19 uses TK in reply
+        messages. Disambiguate by which flow the message belongs to.
+  - code: TL
+    category: booking_confirm
+    description: Confirmed with ticketing time limit
+  - code: TN
+    category: booking_confirm
+    description: Requested confirmation pending
+  - code: PK
+    category: booking_confirm
+    description: Confirmed, passive booking
+    meta:
+      source_note: >
+        Source document also lists PK under "passive/information segment"
+        as "Passive confirm" -- same meaning, reworded. REQ03 section 17
+        also uses PK/PL/PU for passive-segment ticketing flows.
+  - code: PS
+    category: booking_confirm
+    description: Passive segment sold
+
+  # --- 2. Waitlist / pending -------------------------------------------
+  - code: HL
+    category: waitlist_pending
+    description: Holding, waitlist
+  - code: HN
+    category: waitlist_pending
+    description: Holding, need / not confirmed
+  - code: PN
+    category: waitlist_pending
+    description: Pending, need
+    meta:
+      source_note: >
+        Source document also lists PN under "passive/information segment"
+        as "Passive request" -- a different meaning under the same code.
+        Likely context-dependent (regular booking vs. passive-segment
+        flow). Flagged for author review before use in passive-segment
+        handling.
+  - code: PL
+    category: waitlist_pending
+    description: Pending, waitlist
+    meta:
+      source_note: >
+        Source document also lists PL under "passive/information segment"
+        as "Passive waitlist" -- same pattern as PN above.
+  - code: WL
+    category: waitlist_pending
+    description: Waitlist
+  - code: LL
+    category: waitlist_pending
+    description: Waitlist from long sell
+    meta:
+      source_note: >
+        Unrelated code reuse: "LL" is also an AVS/AVN "L-type" status code
+        meaning "limit sale, waitlist open" (see avn_status_codes.yaml).
+        Different table, different meaning -- disambiguate by message type
+        (AVS/AVN vs. PNR segment status), not just the code alone.
+  - code: GL
+    category: waitlist_pending
+    description: Group waitlist
+    meta:
+      source_note: Also listed under "group booking status" in the source document with the same meaning.
+
+  # --- 3. Unable / cancel -----------------------------------------------
+  - code: HX
+    category: unable_cancel
+    description: Cancelled
+  - code: NO
+    category: unable_cancel
+    description: No action taken
+  - code: UC
+    category: unable_cancel
+    description: Unable to confirm
+  - code: UN
+    category: unable_cancel
+    description: Unable, seat not available
+  - code: US
+    category: unable_cancel
+    description: Unable, flight operating differently
+  - code: UU
+    category: unable_cancel
+    description: Unable, flight schedule change
+  - code: XK
+    category: unable_cancel
+    description: Cancel from waitlist
+  - code: XL
+    category: unable_cancel
+    description: Waitlist cancel
+
+  # --- 4. Status code due to schedule change -----------------------------
+  - code: SC
+    category: schedule_change
+    description: Schedule change
+  - code: SD
+    category: schedule_change
+    description: Segment sold due to schedule disruption (new schedule)
+  - code: SK
+    category: schedule_change
+    description: Schedule change confirmed
+  - code: WK
+    category: schedule_change
+    description: Was confirmed
+  - code: BK
+    category: schedule_change
+    description: Booking passive confirmed
+
+  # --- 5. Airport check-in related ---------------------------------------
+  - code: CK
+    category: checkin
+    description: Checked in
+    meta:
+      source_note: >
+        Unrelated code reuse: "CK" is also an error/RAS-option code
+        meaning "check input" (see error_codes.yaml). Different table,
+        different meaning.
+  - code: RR
+    category: checkin
+    description: Reconfirm
+  - code: SA
+    category: checkin
+    description: Space available
+  - code: NS
+    category: checkin
+    description: No seat
+  - code: AK
+    category: checkin
+    description: Access denied / airport control
+
+  # --- 6. Group booking status ---------------------------------------------
+  - code: GK
+    category: group
+    description: Group confirmed
+  - code: GN
+    category: group
+    description: Group request
+  - code: GX
+    category: group
+    description: Group cancel
+
+  # --- 7. Passive / information segment -----------------------------------
+  - code: PX
+    category: passive
+    description: Passive cancelled
+
+  # --- Booking action codes (distinct list in the source document) --------
+  - code: NN
+    category: booking_action
+    description: Booking request (Need Need)
+  - code: SS
+    category: booking_action
+    description: Booking force (Force book)
+  - code: DK
+    category: booking_action
+    description: Direct sell booking, already holding seat (GDS)

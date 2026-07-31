@@ -1,0 +1,57 @@
+# Availability status codes -- REQ02AVSAVNREQUIREMENTV1_1_docx.pdf,
+# sections 1-2, pages 2-8.
+#
+# Two named-code families here:
+#   "C" type -- closes/opens the two named points (overrides "L")
+#   "L" type -- closes/opens limited to the two named cities (does not
+#               override "C")
+#
+# Plus two *parametric* families that are not enumerable one-by-one:
+#   "A" + digit (A0-A9)  -- seats currently available for sale
+#   "L" + digit (L0-L9)  -- seats currently available, request-only
+# These are handled by loader.match_numeric_availability_code(), not listed
+# as table rows -- see that function's docstring.
+
+entries:
+  - code: AS
+    category: open
+    description: Open flight/segment (reopens whatever was closed by CN/CS/CR/CC/CL)
+  - code: CN
+    category: close_c_type
+    description: Flight close, no-op
+  - code: CS
+    category: close_c_type
+    description: Segment close, including legs within it
+  - code: CR
+    category: close_c_type
+    description: Flight close, request only, including legs
+  - code: CC
+    category: close_c_type
+    description: Flight close, waitlist close, including legs
+  - code: CL
+    category: close_c_type
+    description: Flight close, waitlist open
+  - code: LA
+    category: open_l_type
+    description: >
+      Reopen automatic selling previously closed by LR/LL/LC/LN. Does not
+      apply if closed instead by a "C" type code; applies only to the two
+      cities named (and cities passed through), not the whole flight.
+  - code: LR
+    category: close_l_type
+    description: Limit sale, request only (seats = 0)
+  - code: LL
+    category: close_l_type
+    description: Limit sale, waitlist open
+    meta:
+      source_note: >
+        Unrelated code reuse: "LL" is also a PNR segment status code
+        meaning "waitlist from long sell" (see segment_status_codes.yaml).
+        Different table, different meaning -- disambiguate by message
+        type (AVS/AVN vs. PNR segment status).
+  - code: LC
+    category: close_l_type
+    description: Limit sale, waitlist close
+  - code: LN
+    category: close_l_type
+    description: Limit sale, landing cancel, no-op

@@ -1,0 +1,27 @@
+# Name title suffixes -- REQ03 section 9 "Name Element" (p.9-10).
+# A NAME line glues the title directly onto the given name with no
+# separator (e.g. "BAMBANGMR" = given name "BAMBANG" + title "MR"), so
+# splitting it requires knowing which suffixes are valid titles. Ordered
+# longest-first in code (not here) so "MSTR"/"MISS" are checked before
+# "MR"/"MS" -- otherwise "BAMBANGMRS" could be wrongly split as
+# "BAMBANGM" + "RS" if a shorter title were checked first.
+
+entries:
+  - code: MR
+    category: name_title
+    description: Mister
+  - code: MRS
+    category: name_title
+    description: Missus (married woman)
+  - code: MS
+    category: name_title
+    description: Ms (woman, marital status unspecified)
+  - code: MISS
+    category: name_title
+    description: Miss (unmarried woman / child)
+  - code: MSTR
+    category: name_title
+    description: Master (male child)
+  - code: DR
+    category: name_title
+    description: Doctor

@@ -1,0 +1,36 @@
+# Error/validation reply codes -- REQ02AVSAVNREQUIREMENTV1_1_docx.pdf, p.16.
+# Used in RVR/AVR error responses (e.g. "ER INVALID DATE").
+
+entries:
+  - code: ER
+    category: error
+    description: Message error (accompanied by explanatory free text, e.g. "INVALID DATE")
+  - code: UN
+    category: error
+    description: Unable to process
+    meta:
+      source_note: >
+        Same code "UN" is also a PNR segment status meaning "unable, seat
+        not available" (see segment_status_codes.yaml). Different table,
+        different context -- disambiguate by message type.
+  - code: NO
+    category: error
+    description: Not available
+    meta:
+      source_note: >
+        Same code "NO" is also a PNR segment status meaning "no action
+        taken" (see segment_status_codes.yaml).
+  - code: CK
+    category: error
+    description: Check input
+    meta:
+      source_note: >
+        Same code "CK" is also a PNR segment status meaning "checked in"
+        (see segment_status_codes.yaml).
+  - code: HX
+    category: error
+    description: Flight cancel / not operating
+    meta:
+      source_note: >
+        Same code "HX" is also a PNR segment status meaning "cancelled"
+        (see segment_status_codes.yaml).

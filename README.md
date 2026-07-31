@@ -2,9 +2,15 @@
 
 A from-scratch rebuild of the Type B parser/generator, built alongside the
 original single-file `app.py` (see `typeb_parser_handoff.md` in the main
-project) for direct comparison. Same functional scope for now --
-**AVN, RVR, and booking-hold messages** -- but structured so adding the
-rest of REQ03's ~60 message identifiers later doesn't require a rewrite.
+project) for direct comparison. Scope: **AVN, RVR, and booking-hold
+messages** end-to-end -- raw Type B text in, structured JSON out via a
+live Flask API -- built so adding more of REQ03's ~60 message identifiers
+later doesn't require a rewrite.
+
+**117 tests passing.** The full pipeline works: envelope parsing,
+element parsing (NAME/SEGMENT/SSR/OSI/AVAILABILITY_LINE/RECAP_LINE),
+passenger cross-referencing, and all three message-type orchestrators
+are built and wired to `POST /parse`.
 
 ## Why a separate layout
 
@@ -12,74 +18,100 @@ The original parser has one function per message type
 (`parse_availability`, `parse_rvr`, `parse_booking`, ...). Every new
 message type meant a new parser written from scratch. But re-reading
 REQ03 sections 3 and 7-13, every reservation message shares the same
-envelope and the same ~8 element types (NAME, SEGMENT, ARRIVAL, SSR, OSI,
-AUX, markers) -- what differs between message types is *which elements
-are required or forbidden*, not the elements themselves.
+envelope and the same handful of element types (NAME, SEGMENT, SSR, OSI,
+markers) -- what differs between message types is *which elements are
+required or forbidden*, not the elements themselves.
 
 So this variant separates:
 
 - `typeb/tables/` -- reference data (message identifiers, status codes,
-  etc.) as YAML, not Python conditionals
-- `typeb/envelope/` -- address/comm-ref/record-locator parsing (shared by
-  every message type)
-- `typeb/elements/` -- one parser per element type (shared by every
-  message type)
-- `typeb/model/` -- typed domain model
-- `typeb/profiles/` -- per-partner bilateral-agreement config
-- `typeb/reply/` -- request -> reply transform rules
+  titles, etc.) as YAML, not Python conditionals
+- `typeb/envelope/` -- address/comm-ref/record-locator parsing, plus
+  input normalization (shared by every message type)
+- `typeb/elements/` -- one parser per element type, plus the tokenizer
+  that classifies body lines and the cross-reference layer that merges
+  scattered passenger data (shared by every message type)
+- `typeb/model/` -- typed Pydantic domain models
+- `typeb/messages/` -- one orchestrator per message type (`booking.py`,
+  `avn.py`, `rvr.py`), each combining envelope + tokenizer + element
+  parsers + cross-referencing into one `raw text -> JSON model` function
+- `typeb/profiles/` -- per-partner bilateral-agreement config (not built
+  yet)
+- `typeb/reply/` -- request -> reply transform rules (not built yet)
 
-Adding a new message type later should mostly mean: a profile entry
-(which elements it uses) + golden test files, not new parsing code.
+Adding a new message type later should mostly mean: a new file in
+`typeb/messages/`, a new output model in `typeb/model/`, and golden test
+files -- reusing the existing tokenizer, element parsers, and
+cross-reference layer as-is.
 
-## Status: Steps 1-2 complete
+## What's built
 
-- **Step 1** -- `typeb/tables/` -- every reference table loads and
-  validates at startup (8 tables, 69 message identifiers).
-- **Step 2** -- `typeb/model/envelope.py` + `typeb/envelope/parser.py` --
-  address block, communication reference, optional message identifier,
-  optional record locator. Structural, not line-number based: it
-  classifies each line by shape (via `typeb.tables.loader`) rather than
-  assuming a fixed position, so it isn't broken by multi-address messages
-  or by identifiers (DVD, BPR, ...) that insert extra record-locator
-  lines the original line-3/line-4 heuristic didn't expect.
+**Tables** (`typeb/tables/`) -- 9 reference tables, 69 message
+identifiers, loaded and validated at import time. Fails fast and loudly
+on a malformed table rather than misbehaving on first request.
 
-  Whether a given message identifier carries a record locator at all is
-  a table flag (`meta.has_record_locator` in `message_identifiers.yaml`),
-  not a hardcoded assumption -- set only where a real worked spec example
-  confirms it. Unverified identifiers raise a clear error rather than
-  guessing (see `test_unverified_identifier_refuses_to_guess`).
+**Envelope** (`typeb/envelope/`) -- address block (multi-address
+capable), communication reference, optional message identifier, optional
+record locator (0, 1, or 2 lines, per identifier). Whether a given
+identifier carries a record locator is a table flag set only where a
+real worked example confirms it -- unverified identifiers raise rather
+than guess. Input normalization runs first and fixes only what's
+unambiguous (CRLF, whitespace, case, blank lines) -- see
+`typeb/envelope/normalize.py`'s docstring for the line between "safe to
+nudge" and "don't guess."
 
-- **Step 2.5** -- `typeb/envelope/normalize.py` -- input normalization,
-  applied automatically before structural parsing. Fixes only what's
-  *unambiguous*: CRLF line endings, stray whitespace, lowercase input
-  (Type B's allowed character set is uppercase-only per REQ03 section 3,
-  so correcting case can't lose information), and blank lines. Every
-  correction is logged (`NormalizationResult.changes`), nothing is
-  silently altered. Deliberately does **not** try to resolve genuine
-  structural ambiguity -- glued vs. spaced fields, missing digits -- since
-  REQ02/REQ03 attribute that variation to bilateral agreement between
-  specific senders, and guessing wrong there produces a *confidently
-  wrong* parse rather than a clear failure. That's handled later by
-  per-partner profiles once we know who's sending, not by blanket
-  coercion applied to everyone. See `tests/test_normalize.py` for the
-  line between what gets fixed and what still fails loudly.
+**Elements** (`typeb/elements/`):
+- `name.py` -- the NAME element, in **two separate logics**: shared
+  surname (`3FORD/E/B/C`) and distinct surnames (multiple different
+  people chained on one line, each fully spelled out, boundaries found
+  by scanning for titles). Also handles the FOID/EXST/CBBG seat-modifier
+  case and the "no given name at all" case (`1DUVALIER/MISS`).
+- `segment.py` -- booking-context flight segments (glued
+  airline+flight+RBD+date).
+- `availability.py` -- AVN body lines (spaced fields -- a genuinely
+  different shape from SEGMENT, not a bug).
+- `recap.py` -- RVR body lines, **two shapes**: date-range-with-frequency
+  and single-date-with-optional-route (route omitted means "ALL", not an
+  error).
+- `ssr.py` / `osi.py` -- FOID, INFT/CHLD, and the shared email/DOB
+  contact-info shape (which both SSR and OSI can carry, with or without
+  a 4-letter code).
+- `cross_reference.py` -- matches OSI/SSR name-references back to NAME
+  elements by `(surname, given_name, title)`, derives passenger type
+  (ADT/CHD/INF), merges email/DOB/FOID. Raises on any ambiguity
+  (conflicting type signals, unmatched references, duplicate keys)
+  rather than guessing. Generic, not booking-specific.
+- `tokenizer.py` -- classifies body lines by shape before dispatch.
 
-  Pydantic models also carry `str_strip_whitespace=True,
-  str_to_upper=True` as defense-in-depth, for anyone constructing them
-  directly without going through `parse_envelope()`.
+**Messages** (`typeb/messages/`) -- `booking.py`, `avn.py`, `rvr.py`,
+each a full orchestrator. Policy: a genuinely malformed line fails the
+whole message; a structurally-fine-but-unimplemented line (e.g. an SSR
+code beyond FOID/INFT/CHLD) is collected into `unrecognized_lines`
+instead of blocking the rest of the parse.
 
-Nothing below the envelope (NAME/SEGMENT/SSR/OSI elements, the body
-tokenizer) is implemented yet.
+**API** (`app.py`) -- `GET /health` (table load confirmation) and
+`POST /parse` (raw Type B text in, dispatches automatically by message
+identifier to the right orchestrator, returns
+`{"data": {...}, "detected_msg_id": "..."}` or `{"error": "..."}` with a
+400 on any parse failure).
 
-While transcribing the three source PDFs into these tables, several
-real contradictions and ambiguities in the spec turned up (OCR damage,
-codes reused with different meanings under different headings, AVS
-meaning something different in REQ02 vs REQ03). These are recorded as
-`meta.source_note` fields directly on the relevant table entries rather
-than silently resolved -- see `typeb/tables/loader.py`'s docstring for
-the policy, and grep `source_note` across `typeb/tables/data/*.yaml` for
-the full list. Worth reviewing with whoever owns the spec (I Wayan Parka)
-before they matter in practice.
+## What's explicitly NOT built yet (flagged, not silently skipped)
+
+- A genuinely mixed NAME line (some people sharing a surname, some not,
+  in the same line) still correctly raises rather than guessing --
+  distinct from the (now-handled) all-shared or all-distinct cases.
+- Continuation lines (NAME lines exceeding 69 chars)
+- Double-letter/space/hyphen collapsing in names
+- The automated SSR format (NSST, SMSW, BIKE, meal codes, etc.) and
+  OSI TKNO
+- ARRIVAL element, structured record-locator parsing (POS breakdown)
+- Reply generation (`typeb/reply/`) and partner profiles
+  (`typeb/profiles/`)
+- Several genuine spec ambiguities are recorded as `meta.source_note`
+  fields in the YAML tables and as docstring notes in the relevant
+  parsers rather than silently resolved -- grep `source_note` across
+  `typeb/tables/data/*.yaml`, and check `typeb/elements/recap.py` and
+  `typeb/elements/name.py` for the ones found during parser development.
 
 ## Setup
 
@@ -95,7 +127,7 @@ pip install -r requirements.txt
 pytest -v
 ```
 
-All tests should pass -- this only proves the reference tables are well-formed, not that any parsing works yet (there isn't any yet).
+Should show **117 passed**.
 
 ## Run the app
 
@@ -103,32 +135,30 @@ All tests should pass -- this only proves the reference tables are well-formed, 
 python app.py
 ```
 
-Then in Hoppscotch: `GET http://localhost:5000/health` should return
-`{"status": "ok", "tables_loaded": {...counts per table...}}`. If any
-table is malformed, the app will refuse to start at all -- check the
-traceback, it will name the file and the problem.
+In Hoppscotch:
+- `GET http://localhost:5000/health` -- confirms tables loaded
+- `POST http://localhost:5000/parse` -- body as **Text/Plain**, raw Type
+  B message. Dispatches automatically based on the message's identifier
+  (or the implicit booking type when there's no identifier line).
 
-## Try the envelope parser yourself
+## Try it in a Python shell
 
 ```python
-from typeb.envelope.parser import parse_envelope
+from typeb.messages.booking import parse_booking_message
 
-raw = """QU FTWRMAA
-.HDQRI8G 201025
-AVN
-AA800 F 01JUN CGKDPS
-NNNN"""
+raw = """QU CGKRM8G
+.NYCRM1G 050110
+NYC1G CPNR1G/AAA/111122223333/NYC/1G/NL/CHF/SU
+1RAHARJO/BAMBANGMR
+8G083F24SEP CGKDPS NN1 0910 1015"""
 
-envelope, body_lines = parse_envelope(raw)
-print(envelope.model_dump())
-print(body_lines)
+msg = parse_booking_message(raw)
+print(msg.model_dump())
 ```
 
 ## Next step
 
-Step 3: the element layer -- NAME, SEGMENT, ARRIVAL, SSR, OSI parsers,
-plus the body tokenizer that groups raw body lines (the `body_lines`
-returned by `parse_envelope`) into elements before dispatching each to
-its parser. This is where `split_glued_title` and the passenger-matching
-question from the original project's handoff come back into play, now
-against a shared element model instead of being booking-specific.
+The cross-reference and orchestration layers are done; the natural next
+piece is either (a) the SSR/OSI codes still out of scope (automated
+format, TKNO), or (b) starting on reply generation now that request
+parsing produces a solid structured model to transform.

@@ -10,24 +10,37 @@ worked examples (surname/title punctuation is deliberate, not typos):
     4. "E FORD, B FORD, C FORD"         -> 3FORD/E/B/C
     5. "MRS. B KHOWRY"                  -> 1KHOWRY/MRS
 
-The rule these examples encode: a NAME line is
-'<number in party><surname>/<given-name tokens...>'. The number of
-given-name tokens is either exactly `number_in_party` (one per person;
-the title is glued onto the LAST person's token if present, e.g. "JEANMR"
--- and if that whole token IS a title with nothing else, that person has
-no given name at all, e.g. example 3/5), or exactly `number_in_party + 1`
-(everyone has a given name, and the LAST person's title is instead its
-own separate final token, e.g. example 2's "EDWARDCHARLES"+"MR"). No
-other token count matches the documented grammar -- anything else raises
-rather than guessing (this is what catches out-of-spec real-world
-variants, e.g. a line packing two different surnames under one
-number-in-party, which does NOT fit either accepted shape).
+These five encode ONE shape -- shared surname, one token per person --
+which this module calls Logic A: '<number in party><surname>/<given-name
+tokens...>', where the number of given-name tokens is either exactly
+`effective party count` (title glued onto or replacing the LAST
+person's token) or `effective party count + 1` (title as its own
+separate final token).
 
-Only the LAST person in a party can carry a title -- that's the only
-slot the format provides. Earlier people in a group are always
-given-name-only (example 4's E and B are plain; C is last and still ends
-up untitled only because "C" doesn't end with any known title -- see
-_split_glued_title).
+A SECOND, distinct shape exists in real traffic: multiple people with
+DIFFERENT surnames chained onto one line, each fully spelled out --
+e.g. "2WIJAYA/RINAMAHARANI/MRS/SIREGAR/BAYIRINA/MSTR" (two people,
+different surnames) or the adult+infant packing seen elsewhere in this
+project, "2KUSUMA/BUDISANTOSO/MR/ANGGARA/BAYIBUDI/MR". This shape has no
+basis in REQ03's own worked examples -- it's built from real-world
+usage, confirmed by the person composing this instruction. This module
+calls it Logic B: person boundaries are found by scanning for titles
+(standalone token OR glued suffix, e.g. "KEVINMR") rather than by a
+fixed token count. Whatever accumulated since the last boundary becomes
+one person, with the FIRST token of that chunk as their surname and the
+rest as given name. A final person with no title at all is allowed,
+closed by end-of-input rather than by finding a title (same as Logic
+A's last-person-may-be-untitled allowance).
+
+Logic A is ALWAYS tried first. It only "declines" (returns None) rather
+than raising when the token count doesn't fit its shape -- every case
+Logic A already handles has a token count that satisfies it, so Logic B
+is never attempted for those; it only runs when Logic A's structural
+precondition fails. If NEITHER logic produces a person count matching
+the line's own number_in_party, the line raises rather than guessing --
+this is what catches genuinely unclassifiable variants (e.g. 3 people
+where 2 share a surname and 1 doesn't, mixing both shapes in one line --
+not evidenced by any example seen so far, so not built).
 
 Single-letter initials being silently dropped (example 5: "B" from
 "MRS. B KHOWRY" simply never appears) happens upstream, when the message
@@ -38,7 +51,7 @@ NOT implemented here (explicitly deferred, not silently ignored):
   - Continuation lines (a NAME line exceeding 69 chars repeats the
     leading number + group name on the next physical line)
   - EXST (extra seat) / CBBG (cabin bag) / JR / SR occupying the title
-    slot
+    slot within Logic B specifically (built for Logic A already)
   - Double-letter / space / hyphen collapsing in names (e.g. "ALI BABA"
     -> "ALIBABA") -- this alters content, not just formatting, and isn't
     implemented until the exact collapsing rule is confirmed
@@ -59,7 +72,8 @@ _OPTIONAL_LEADING_DIGITS_RE = re.compile(r"^(\d{1,3})?(.*)$")
 # number_in_party for a "phantom seat" that isn't a real person. Only
 # ONE modifier per line is evidenced (the DOOLEY/EXST example) -- support
 # for stacking more than one isn't built since there's nothing to verify
-# it against.
+# it against. Only handled in Logic A -- not evidenced in a Logic B
+# (distinct-surnames) context.
 _SEAT_MODIFIER_KEYWORDS = {"EXST", "CBBG"}
 
 
@@ -68,10 +82,10 @@ def _known_titles_longest_first() -> list[str]:
 
 
 def _split_glued_title(token: str) -> tuple[str | None, str | None]:
-    """Returns (given_name, title). If the whole token IS a known title
-    (nothing else attached), given_name is None -- REQ03 examples 3/5:
-    no first/middle name was given, the title occupies the whole slot.
-    If the token ends with a known title and has more before it, splits
+    """Returns (leftover, title). If the whole token IS a known title
+    (nothing else attached), leftover is None -- REQ03 examples 3/5: no
+    first/middle name was given, the title occupies the whole slot. If
+    the token ends with a known title and has more before it, splits
     them (example 1: "JEANMR" -> "JEAN" + "MR"). Longest-title-first so
     "BAMBANGMRS" isn't wrongly split by matching the shorter "MR" first.
     If nothing matches, returns the token unchanged with title=None."""
@@ -81,6 +95,91 @@ def _split_glued_title(token: str) -> tuple[str | None, str | None]:
         if token.endswith(title) and len(token) > len(title):
             return token[: -len(title)], title
     return token, None
+
+
+def _try_parse_shared_surname(
+    trailing: list[str], effective_party_count: int, known_titles: set[str]
+) -> list[Person] | None:
+    """Logic A: one token per person (title glued onto or replacing the
+    last person's token), or one extra token for a standalone final
+    title -- e.g. "3FORD/E/B/C" or "1JONES/EDWARDCHARLES/MR". Returns
+    None (not an error) if the token count doesn't fit either shape --
+    the caller falls back to _try_parse_distinct_surnames."""
+    if len(trailing) == effective_party_count + 1:
+        given_name_tokens, title_token = trailing[:-1], trailing[-1]
+        if title_token not in known_titles:
+            return None
+        people: list[Person] = []
+        for i, token in enumerate(given_name_tokens):
+            is_last = i == len(given_name_tokens) - 1
+            people.append(
+                Person(given_name=token, title=title_token if is_last else None)
+            )
+        return people
+
+    if len(trailing) == effective_party_count:
+        people = []
+        for i, token in enumerate(trailing):
+            is_last = i == len(trailing) - 1
+            if is_last:
+                given_name, title = _split_glued_title(token)
+            else:
+                given_name, title = token, None
+            people.append(Person(given_name=given_name, title=title))
+        return people
+
+    return None
+
+
+def _chunk_to_person(chunk: list[str], title: str | None) -> Person:
+    surname_token, *given_tokens = chunk
+    given_name = " ".join(given_tokens) if given_tokens else None
+    return Person(surname=surname_token, given_name=given_name, title=title)
+
+
+def _try_parse_distinct_surnames(
+    full_sequence: list[str], effective_party_count: int
+) -> list[Person] | None:
+    """Logic B: each person fully spelled out with their OWN surname,
+    chained together -- e.g.
+    "WIJAYA/RINAMAHARANI/MRS/SIREGAR/BAYIRINA/MSTR" (two people,
+    different surnames). Person boundaries are found by scanning every
+    token for a title (standalone, or glued as a suffix like "KEVINMR")
+    -- everything accumulated since the last boundary belongs to one
+    person, whose first token is their surname and the rest is given
+    name. A final person with no title is allowed, closed by
+    end-of-input.
+
+    Returns None (not an error) if the resulting person count doesn't
+    match effective_party_count -- this is the safety net that keeps
+    Logic B from silently misinterpreting a genuinely different or
+    mixed shape (e.g. a shared-surname group with no titles at all would
+    resolve to exactly 1 person here, which almost never matches the
+    declared count, and correctly falls through to raising instead of
+    being accepted).
+    """
+    people: list[Person] = []
+    chunk: list[str] = []
+
+    for token in full_sequence:
+        leftover, title = _split_glued_title(token)
+        if title is None:
+            chunk.append(token)
+            continue
+        if leftover:
+            chunk.append(leftover)
+        if not chunk:
+            return None  # a title with nothing accumulated -- not this shape
+        people.append(_chunk_to_person(chunk, title))
+        chunk = []
+
+    if chunk:
+        people.append(_chunk_to_person(chunk, None))
+
+    if len(people) != effective_party_count:
+        return None
+
+    return people
 
 
 def parse_name_element(line: str) -> NameElement:
@@ -109,6 +208,7 @@ def parse_name_element(line: str) -> NameElement:
             people=[],
             is_group_placeholder=True,
             seat_modifiers=[],
+            uses_distinct_surnames=False,
         )
 
     parts = rest.split("/")
@@ -123,8 +223,7 @@ def parse_name_element(line: str) -> NameElement:
 
     # Strip a trailing seat modifier (EXST/CBBG) before doing anything
     # else -- it consumes one slot of number_in_party without describing
-    # a real person, so the party-size math below needs to account for
-    # it separately (see REQ03 p.11's DOOLEY/EXST example).
+    # a real person. Logic A only -- not evidenced for Logic B.
     seat_modifiers: list[str] = []
     if trailing and trailing[-1] in _SEAT_MODIFIER_KEYWORDS:
         seat_modifiers.append(trailing.pop())
@@ -135,7 +234,6 @@ def parse_name_element(line: str) -> NameElement:
             f"NAME line has more seat-modifier tokens ({seat_modifiers}) "
             f"than number_in_party={number_in_party} can account for: {line!r}"
         )
-
     if not trailing:
         raise ElementParseError(
             f"NAME line has a seat modifier ({seat_modifiers}) but no "
@@ -143,48 +241,26 @@ def parse_name_element(line: str) -> NameElement:
         )
 
     known_titles = set(loader.name_title_codes().keys())
-    people: list[Person] = []
 
-    if len(trailing) == effective_party_count + 1:
-        # Title is its own separate final token (REQ03 example 2).
-        given_name_tokens, title_token = trailing[:-1], trailing[-1]
-        if title_token not in known_titles:
-            raise ElementParseError(
-                f"NAME line has {effective_party_count + 1} given-name/title "
-                f"tokens after the surname (one more than the effective "
-                f"party count of {effective_party_count}), which only fits "
-                f"the grammar if the final token is a standalone title -- "
-                f"got {title_token!r} in {line!r}"
-            )
-        for i, token in enumerate(given_name_tokens):
-            is_last = i == len(given_name_tokens) - 1
-            people.append(
-                Person(given_name=token, title=title_token if is_last else None)
-            )
+    people = _try_parse_shared_surname(trailing, effective_party_count, known_titles)
+    uses_distinct_surnames = False
 
-    elif len(trailing) == effective_party_count:
-        # One token per person; the LAST person's token may have a
-        # title glued on (or be a title with no given name at all).
-        for i, token in enumerate(trailing):
-            is_last = i == len(trailing) - 1
-            if is_last:
-                given_name, title = _split_glued_title(token)
-            else:
-                given_name, title = token, None
-            people.append(Person(given_name=given_name, title=title))
+    if people is None:
+        full_sequence = [surname] + trailing
+        people = _try_parse_distinct_surnames(full_sequence, effective_party_count)
+        uses_distinct_surnames = people is not None
 
-    else:
+    if people is None:
         raise ElementParseError(
             f"NAME line has {len(trailing)} given-name/title tokens after "
             f"the surname (after removing any seat modifier), but the "
-            f"effective party count is {effective_party_count} -- the "
-            f"documented grammar (REQ03 section 9) only accounts for "
-            f"{effective_party_count} tokens (title glued onto or "
-            f"replacing the last person's token) or "
-            f"{effective_party_count + 1} (title as its own separate "
-            f"final token). Not confidently handled -- refusing to guess "
-            f"rather than silently mis-parsing a possibly out-of-spec "
-            f"variant: {line!r}"
+            f"effective party count is {effective_party_count} -- this "
+            f"doesn't fit the shared-surname grammar ({effective_party_count} "
+            f"or {effective_party_count + 1} tokens) or the "
+            f"distinct-surnames grammar (each person fully spelled out, "
+            f"boundaries found by titles). Not confidently handled -- "
+            f"refusing to guess rather than silently mis-parsing a "
+            f"possibly out-of-spec variant: {line!r}"
         )
 
     return NameElement(
@@ -194,6 +270,7 @@ def parse_name_element(line: str) -> NameElement:
         people=people,
         is_group_placeholder=False,
         seat_modifiers=seat_modifiers,
+        uses_distinct_surnames=uses_distinct_surnames,
     )
 
 

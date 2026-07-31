@@ -73,7 +73,12 @@ def cross_reference_passengers(
         if ne.is_group_placeholder:
             continue
         for person in ne.people:
-            key = _passenger_key(ne.surname, person.given_name, person.title)
+            # Person.surname is only set under Logic B (distinct
+            # surnames) -- see typeb.model.elements.Person's docstring.
+            # Under Logic A (shared surname), it's None, meaning "use
+            # the NameElement's own surname" as before.
+            person_surname = person.surname if person.surname else ne.surname
+            key = _passenger_key(person_surname, person.given_name, person.title)
             if key in pool:
                 raise CrossReferenceError(
                     f"Two different people resolve to the same "
@@ -82,7 +87,7 @@ def cross_reference_passengers(
                     f"to this name means. NAME line: {ne.raw!r}"
                 )
             pool[key] = {
-                "surname": ne.surname,
+                "surname": person_surname,
                 "given_name": person.given_name,
                 "title": person.title,
                 "passenger_type": "ADT",

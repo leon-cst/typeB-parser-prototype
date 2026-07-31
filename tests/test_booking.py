@@ -132,10 +132,11 @@ NYC1G CPNR1G/AAA/111122223333/NYC/1G/NL/CHF/SU
         parse_booking_message(raw)
 
 
-def test_malformed_name_fails_the_whole_message():
-    # The real-world divergent shape from earlier in this project --
-    # confirmed to still hard-fail through the full orchestrator, not
-    # just in isolation.
+def test_distinct_surnames_adult_and_infant_now_parses_through_full_pipeline():
+    # This was the original real-world divergent shape that used to hard
+    # fail through the full orchestrator. Once Logic B (distinct
+    # surnames) was added per explicit instruction, it now correctly
+    # resolves into two passengers.
     raw = """\
 QU CGKRM8G
 .NYCRM1G 050110
@@ -143,8 +144,12 @@ NYC1G CPNR1G/AAA/111122223333/NYC/1G/NL/CHF/SU
 2KUSUMA/BUDISANTOSO/MR/ANGGARA/BAYIBUDI/MR
 8G083F24SEP CGKDPS NN2 0910 1015"""
 
-    with pytest.raises(ElementParseError, match="Not confidently handled"):
-        parse_booking_message(raw)
+    msg = parse_booking_message(raw)
+    assert len(msg.passengers) == 2
+    by_surname = {p.surname: p for p in msg.passengers}
+    assert by_surname["KUSUMA"].given_name == "BUDISANTOSO"
+    assert by_surname["ANGGARA"].given_name == "BAYIBUDI"
+    assert msg.warnings == []  # party size 2 == segment's NN2, matches
 
 
 def test_party_size_mismatch_produces_warning_not_failure():

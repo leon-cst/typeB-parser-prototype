@@ -96,14 +96,55 @@ def test_name_missing_leading_digits_raises():
         parse_name_element("RAHARJO/BAMBANGMR")
 
 
-def test_name_wrong_token_count_raises_rather_than_guessing():
-    # This is the real out-of-spec shape found in a coworker's example:
-    # number_in_party=2 but 5 tokens after the surname (two different
-    # people's surnames packed into one line) -- doesn't fit either
-    # accepted grammar shape (2 or 3 tokens), so it must raise, not
-    # silently mis-parse.
+def test_name_distinct_surnames_adult_and_infant_now_resolves():
+    # This was the original real-world divergent shape that used to
+    # raise (number_in_party=2, 5 tokens after the surname). Once Logic B
+    # (distinct surnames, boundaries found by titles) was added per
+    # explicit instruction, this correctly resolves into the two real
+    # people it always represented -- confirmed by matching SSR FOID/
+    # SSR INFT lines elsewhere in the same real message.
+    n = parse_name_element("2KUSUMA/BUDISANTOSO/MR/ANGGARA/BAYIBUDI/MR")
+    assert n.uses_distinct_surnames is True
+    assert len(n.people) == 2
+    assert n.people[0].surname == "KUSUMA"
+    assert n.people[0].given_name == "BUDISANTOSO"
+    assert n.people[0].title == "MR"
+    assert n.people[1].surname == "ANGGARA"
+    assert n.people[1].given_name == "BAYIBUDI"
+    assert n.people[1].title == "MR"
+
+
+def test_name_distinct_surnames_with_separator_titles():
+    # The coworker-provided example this feature was actually requested
+    # for.
+    n = parse_name_element("2WIJAYA/RINAMAHARANI/MRS/SIREGAR/BAYIRINA/MSTR")
+    assert n.uses_distinct_surnames is True
+    assert len(n.people) == 2
+    assert n.people[0].surname == "WIJAYA"
+    assert n.people[0].given_name == "RINAMAHARANI"
+    assert n.people[0].title == "MRS"
+    assert n.people[1].surname == "SIREGAR"
+    assert n.people[1].given_name == "BAYIRINA"
+    assert n.people[1].title == "MSTR"
+
+
+def test_name_distinct_surnames_with_glued_titles():
+    # Same shape, but with titles glued onto the given name instead of
+    # being their own token (e.g. "KEVINMR" instead of "KEVIN/MR").
+    n = parse_name_element("2WIJAYA/RINAMAHARANIMRS/SIREGAR/BAYIRINAMSTR")
+    assert n.uses_distinct_surnames is True
+    assert n.people[0].given_name == "RINAMAHARANI"
+    assert n.people[0].title == "MRS"
+    assert n.people[1].given_name == "BAYIRINA"
+    assert n.people[1].title == "MSTR"
+
+
+def test_name_still_raises_on_genuinely_unresolvable_mixed_shape():
+    # 3 people where 2 share a surname (FORD) and 1 has their own
+    # (SIREGAR) -- mixes both shapes in one line. Not evidenced by any
+    # example seen so far, so this must still raise, not guess.
     with pytest.raises(ElementParseError, match="Not confidently handled"):
-        parse_name_element("2KUSUMA/BUDISANTOSO/MR/ANGGARA/BAYIBUDI/MR")
+        parse_name_element("3FORD/E/B/SIREGAR/BAYIRINA/MSTR")
 
 
 def test_name_exst_seat_modifier():

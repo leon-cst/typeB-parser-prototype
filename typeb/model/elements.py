@@ -29,11 +29,20 @@ class Person(BaseModel):
     """One individual within a NAME element's party. REQ03 section 9's
     "3FORD/E/B/C" example is a shared-surname group: one Person per
     given-name token, all sharing the group's surname. Only the LAST
-    person in the party can carry a title -- that's the only slot the
-    format provides (see typeb.elements.name's docstring for the full
-    derivation)."""
+    person in a shared-surname group can carry a title -- that's the
+    only slot that grammar provides.
+
+    surname is None by default, meaning "shares NameElement.surname"
+    (the shared-surname case above). It's set to a real value only for
+    the distinct-surnames shape -- e.g.
+    "2WIJAYA/RINAMAHARANI/MRS/SIREGAR/BAYIRINA/MSTR" is two people with
+    DIFFERENT surnames chained together, each fully spelled out, with
+    person boundaries found by scanning for titles rather than by a
+    fixed token count. See typeb.elements.name's docstring for the full
+    derivation of both shapes and why they need separate logic."""
     model_config = ConfigDict(frozen=True, str_strip_whitespace=True, str_to_upper=True)
 
+    surname: str | None = None  # only set for the distinct-surnames shape
     given_name: str | None  # None when a title occupies this person's
     # only slot and there's no name left (e.g. "1DUVALIER/MISS" -- no
     # first/middle name was given at all, per REQ03 section 9)
@@ -60,6 +69,15 @@ class NameElement(BaseModel):
     modifier attached to one person on a solo NAME line; a group line
     with a modifier on a specific member isn't evidenced by any example
     seen so far.
+
+    uses_distinct_surnames marks the OTHER multi-person shape (as
+    opposed to the shared-surname "3FORD/E/B/C" shape): each person
+    fully spelled out with their own surname, chained together, e.g.
+    "2WIJAYA/RINAMAHARANI/MRS/SIREGAR/BAYIRINA/MSTR". When true, `surname`
+    above is just the FIRST token structurally (not a shared value every
+    person uses) -- read each Person's own `.surname` instead. See
+    typeb.elements.name's module docstring for the full derivation of
+    why these need two separate parsing paths.
     """
     model_config = ConfigDict(frozen=True, str_strip_whitespace=True, str_to_upper=True)
 
@@ -69,6 +87,7 @@ class NameElement(BaseModel):
     people: list[Person]  # empty for group-placeholder lines
     is_group_placeholder: bool
     seat_modifiers: list[str]  # "EXST" and/or "CBBG", usually empty
+    uses_distinct_surnames: bool  # see docstring above
 
 
 class SegmentElement(BaseModel):

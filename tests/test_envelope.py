@@ -11,6 +11,7 @@ part of the transmitted message. That's noted per-fixture below.
 import pytest
 
 from typeb.envelope.parser import EnvelopeParseError, parse_envelope
+from typeb.model.envelope import RecordLocator
 
 
 def test_avn_envelope_has_no_record_locator():
@@ -38,17 +39,14 @@ NNNN"""
     assert envelope.comm_reference.date_time_raw == "201025"
 
     assert envelope.message_identifier == "AVN"
-    assert envelope.record_locator_lines == []  # availability family: none
+    assert envelope.record_locators == []  # availability family: none
 
     assert body[0] == "AA800 F 01JUN CGKDPS"
     assert body[-1] == "NNNN"
 
 
 def test_rvr_envelope_has_no_record_locator():
-    # REQ03 p.13 -- real request example (trailing Indonesian commentary
-    # on the source page, "berlaku untuk all route flight", is the
-    # document's own explanatory annotation and is dropped here, not
-    # part of the wire message)
+    # REQ03 p.13 -- real request example
     raw = """\
 QU HDQRI8G
 .JKTRM1G 161102
@@ -58,7 +56,7 @@ NNNN"""
     envelope, body = parse_envelope(raw)
 
     assert envelope.message_identifier == "RVR"
-    assert envelope.record_locator_lines == []
+    assert envelope.record_locators == []
     assert body[0] == "8G407/16JUN26-30DEC26/1234567"
 
 
@@ -75,9 +73,31 @@ NYC1G CPNR1G/AAA/111122223333/NYC/1G/NL/CHF/SU
 
     assert envelope.message_identifier is None
     assert envelope.effective_identifier == "BOOKING"
-    assert envelope.record_locator_lines == [
-        "NYC1G CPNR1G/AAA/111122223333/NYC/1G/NL/CHF/SU"
-    ]
+    assert len(envelope.record_locators) == 1
+
+    rl = envelope.record_locators[0]
+    assert rl.raw == "NYC1G CPNR1G/AAA/111122223333/NYC/1G/NL/CHF/SU"
+    assert rl.booking_office == "NYC1G"
+    assert rl.location_of_record == "CPNR1G"
+    # POS fields are filled strictly positionally (field 1 -> field N for
+    # however many are present); nothing on the wire marks a field as
+    # skipped mid-sequence, so a value can only be "missing" by being
+    # absent from the END of the line, not the middle. Here "NL" lands
+    # in field 5 (user_type) purely by position, even though it doesn't
+    # match the spec's single-letter A/E/N/T user_type values -- that
+    # mismatch is a real observation about this message, not something
+    # the parser should silently correct by guessing a shift.
+    assert rl.travel_agent_city_code == "AAA"
+    assert rl.iata_number == "111122223333"
+    assert rl.city_airport_code == "NYC"
+    assert rl.crs_code == "1G"
+    assert rl.user_type == "NL"
+    assert rl.iso_country_code == "CHF"
+    assert rl.iso_currency_code == "SU"
+    assert rl.duty_code is None
+    assert rl.user_id_pss is None
+    assert rl.point_of_departure is None
+
     assert body[0] == "1RAHARJO/BAMBANGMR"
     assert body[1] == "8G083F24SEP CGKDPS NN1 0910 1015"
 
@@ -102,7 +122,10 @@ SK919F04JUN CPHJFK HK2/1000 1300"""
     assert envelope.addresses[1].designator == "UA"
 
     assert envelope.message_identifier is None
-    assert envelope.record_locator_lines == ["CPHSK 1713"]
+    assert len(envelope.record_locators) == 1
+    assert envelope.record_locators[0].raw == "CPHSK 1713"
+    assert envelope.record_locators[0].booking_office == "CPHSK"
+    assert envelope.record_locators[0].location_of_record == "1713"
     assert body[0] == "2BORGE/A/D"
 
 
@@ -121,7 +144,20 @@ OSI YY RLOC HDQ8GCPNRSJ"""
     envelope, body = parse_envelope(raw)
 
     assert envelope.message_identifier == "DVD"
-    assert envelope.record_locator_lines == ["HDQ8G CPNRSJ/ABC/12345678/LON/1G/T/GB"]
+    assert len(envelope.record_locators) == 1
+
+    rl = envelope.record_locators[0]
+    assert rl.raw == "HDQ8G CPNRSJ/ABC/12345678/LON/1G/T/GB"
+    assert rl.booking_office == "HDQ8G"
+    assert rl.location_of_record == "CPNRSJ"
+    assert rl.travel_agent_city_code == "ABC"
+    assert rl.iata_number == "12345678"
+    assert rl.city_airport_code == "LON"
+    assert rl.crs_code == "1G"
+    assert rl.user_type == "T"
+    assert rl.iso_country_code == "GB"
+    assert rl.iso_currency_code is None
+
     assert body[0] == "1AAAAA/MR"
     assert body[1] == "SJ920Y15FEB SINAMS XX1"
 
@@ -129,7 +165,9 @@ OSI YY RLOC HDQ8GCPNRSJ"""
 def test_bpr_double_record_locator():
     # REQ03 p.62 -- real BPR example with a primary AND secondary record
     # locator line (REQ03 p.9's "bilateral agreement" primary/secondary
-    # rule in practice) before the name element
+    # rule in practice) before the name element. The primary line's
+    # trailing "/////"  is a run of empty POS fields -- still valid,
+    # every field just resolves to None.
     raw = """\
 QU HDQRMSJ
 .HDQRM1B 131210
@@ -141,11 +179,45 @@ SJ340Y30JUL CGKSIN HK3/1145 1515"""
     envelope, body = parse_envelope(raw)
 
     assert envelope.message_identifier == "BPR"
-    assert envelope.record_locator_lines == [
-        "HDR1B CPNR1B/MADIB0500/1234567/////",
-        "HDQSJ CPNRSJ",
-    ]
+    assert len(envelope.record_locators) == 2
+
+    primary, secondary = envelope.record_locators
+    assert primary.raw == "HDR1B CPNR1B/MADIB0500/1234567/////"
+    assert primary.booking_office == "HDR1B"
+    assert primary.location_of_record == "CPNR1B"
+    assert primary.travel_agent_city_code == "MADIB0500"
+    assert primary.iata_number == "1234567"
+    assert primary.city_airport_code is None
+    assert primary.crs_code is None
+    assert primary.user_type is None
+
+    assert secondary.raw == "HDQSJ CPNRSJ"
+    assert secondary.booking_office == "HDQSJ"
+    assert secondary.location_of_record == "CPNRSJ"
+    assert secondary.travel_agent_city_code is None
+
     assert body[0] == "1AAAAA/RMR 1BBBBB/KMR 1FFFFF/LMR"
+
+
+def test_record_locator_parse_directly():
+    # RecordLocator.parse() exercised directly, independent of the
+    # envelope parser, against the REQ03 p.49 example.
+    rl = RecordLocator.parse("NYC1G CPNR1G/AAA/111122223333/NYC/1G/NL/CHF/SU")
+    assert rl.booking_office == "NYC1G"
+    assert rl.location_of_record == "CPNR1G"
+    assert rl.iso_currency_code == "SU"  # 7th POS value, strictly positional
+
+
+def test_record_locator_parse_missing_separator_raises():
+    with pytest.raises(ValueError, match="missing booking office"):
+        RecordLocator.parse("NOSPACEHERE")
+
+
+def test_record_locator_parse_missing_location_of_record_raises():
+    # Booking office + separator present, but the token after it is
+    # entirely slashes (no location-of-record value at all).
+    with pytest.raises(ValueError, match="missing location of record"):
+        RecordLocator.parse("NYC1G //AAA")
 
 
 def test_unverified_identifier_refuses_to_guess():

@@ -28,7 +28,7 @@ from __future__ import annotations
 import re
 
 from typeb.envelope.normalize import normalize_message
-from typeb.model.envelope import Address, CommReference, Envelope
+from typeb.model.envelope import Address, CommReference, Envelope, RecordLocator
 from typeb.tables import loader
 
 # REQ03 p.9-10: name element = 1-3 digit "number in party" glued directly
@@ -142,18 +142,18 @@ def parse_envelope(raw_message: str) -> tuple[Envelope, list[str]]:
             f"parsing this type. Refusing to guess."
         )
 
-    record_locator_lines: list[str] = []
+    record_locator_raw_lines: list[str] = []
     if has_record_locator:
         max_lines = 2  # primary + optional secondary, REQ03 p.9
         while (
-            len(record_locator_lines) < max_lines
+            len(record_locator_raw_lines) < max_lines
             and idx < len(lines)
             and not _looks_like_name_line(lines[idx])
             and not _looks_like_terminator(lines[idx])
         ):
-            record_locator_lines.append(lines[idx].strip())
+            record_locator_raw_lines.append(lines[idx].strip())
             idx += 1
-        if not record_locator_lines:
+        if not record_locator_raw_lines:
             got = lines[idx] if idx < len(lines) else "<end of message>"
             after = (
                 f"identifier {message_identifier!r}"
@@ -165,11 +165,18 @@ def parse_envelope(raw_message: str) -> tuple[Envelope, list[str]]:
                 f"got: {got!r}"
             )
 
+    try:
+        record_locators = [
+            RecordLocator.parse(line) for line in record_locator_raw_lines
+        ]
+    except ValueError as e:
+        raise EnvelopeParseError(f"Record locator line malformed: {e}") from e
+
     envelope = Envelope(
         priority_code=priority_code,
         addresses=addresses,
         comm_reference=comm_reference,
         message_identifier=message_identifier,
-        record_locator_lines=record_locator_lines,
+        record_locators=record_locators,
     )
     return envelope, lines[idx:]

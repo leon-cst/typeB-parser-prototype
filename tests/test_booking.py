@@ -20,9 +20,11 @@ NYC1G CPNR1G/AAA/111122223333/NYC/1G/NL/CHF/SU
     msg = parse_booking_message(raw)
 
     assert msg.envelope.message_identifier is None
-    assert msg.envelope.record_locator_lines == [
-        "NYC1G CPNR1G/AAA/111122223333/NYC/1G/NL/CHF/SU"
-    ]
+    assert len(msg.envelope.record_locators) == 1
+    rl = msg.envelope.record_locators[0]
+    assert rl.raw == "NYC1G CPNR1G/AAA/111122223333/NYC/1G/NL/CHF/SU"
+    assert rl.booking_office == "NYC1G"
+    assert rl.location_of_record == "CPNR1G"
 
     assert len(msg.passengers) == 1
     p = msg.passengers[0]

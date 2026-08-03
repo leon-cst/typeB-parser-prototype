@@ -1,8 +1,8 @@
 """
-Tests for normalize.py -- the "safe nudging" layer. 
-Split into two groups: normalize_message() tested directly, 
-and full parse_envelope() tests proving that deliberately messy 
-input parses identically to clean input for the safe categories, 
+Tests for normalize.py -- the "safe nudging" layer.
+Split into two groups: normalize_message() tested directly,
+and full parse_envelope() tests proving that deliberately messy
+input parses identically to clean input for the safe categories,
 while genuinely ambiguous/malformed input still fails clearly.
 """
 import pytest
@@ -99,9 +99,11 @@ def test_crlf_and_extra_blank_lines_dont_break_booking_parse():
     )
     envelope, body = parse_envelope(messy)
     assert envelope.message_identifier is None
-    assert envelope.record_locator_lines == [
+    assert len(envelope.record_locators) == 1
+    assert envelope.record_locators[0].raw == (
         "NYC1G CPNR1G/AAA/111122223333/NYC/1G/NL/CHF/SU"
-    ]
+    )
+    assert envelope.record_locators[0].iso_currency_code == "SU"
     assert body[0] == "1RAHARJO/BAMBANGMR"
 
 

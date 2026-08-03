@@ -21,6 +21,19 @@ from typeb.messages.booking import parse_booking_message
 from typeb.messages.rvr import parse_recap_message
 from typeb.tables import loader
 
+from datetime import datetime, timezone
+ 
+from pydantic import ValidationError
+ 
+from typeb.reply.cases.booking_confirm import (
+    ReplyGenerationError,
+    generate_booking_confirm_reply,
+)
+from typeb.reply.decision import ReplyDecision
+from typeb.reply.envelope import ReplyEnvelopeError
+from typeb.reply.rules import ReplyRuleError
+
+
 app = Flask(__name__)
 
 # Load + validate every reference table at import time, not on first
@@ -37,6 +50,12 @@ _ORCHESTRATORS = {
     "AVN": parse_availability_message,
     "RVR": parse_recap_message,
 }
+
+def _current_ddhhmm() -> str:
+    """REQ03's date/time group has no month/year -- day of month + 24hr
+    time only. UTC, since Type B has no timezone field of its own."""
+    return datetime.now(timezone.utc).strftime("%d%H%M")
+
 
 
 @app.get("/health")
@@ -88,6 +107,77 @@ def parse_message():
         "data": message.model_dump(),
         "detected_msg_id": envelope.effective_identifier,
     })
+
+@app.post("/reply")
+def reply_message():
+    """Generate a Type B reply from a Type B request.
+ 
+    Two ways to call this, dispatched by Content-Type:
+ 
+    1. text/plain -- body is just the raw Type B request text. Always
+       defaults to ReplyDecision.confirm_all() (every segment -> KK),
+       with the reply timestamp set to the current time. Convenient for
+       manual/quick testing; no way to specify TK/UC/etc.
+ 
+    2. application/json -- body is
+           { "message": "<raw text>", "decision": {...} }
+       for full control over the reply outcome and timestamp.
+ 
+    Currently only the REQ03 section 19 booking-confirm case is wired
+    up (generate_booking_confirm_reply) -- see typeb/reply/cases/ for
+    adding more cases and a real dispatcher once there's more than one.
+ 
+    Response:
+      text/plain in  -> text/plain out (the raw reply text)
+      application/json in -> { "reply": "<raw reply text>" }
+    """
+    content_type = (request.content_type or "").split(";")[0].strip()
+ 
+    if content_type == "application/json":
+        body = request.get_json(silent=True)
+        if not body or "message" not in body:
+            return jsonify({
+                "error": "Expected JSON body with a 'message' field "
+                         "containing the raw Type B request text."
+            }), 400
+        raw = body["message"]
+        if "decision" not in body:
+            return jsonify({
+                "error": "Expected a 'decision' field describing the "
+                         "reply outcome (see ReplyDecision)."
+            }), 400
+        try:
+            decision = ReplyDecision.model_validate(body["decision"])
+        except ValidationError as e:
+            return jsonify({"error": f"Malformed 'decision': {e}"}), 400
+        respond_as_json = True
+    else:
+        raw = request.get_data(as_text=True)
+        decision = None  # built after parsing, once segment count is known
+        respond_as_json = False
+ 
+    if not raw or not raw.strip():
+        error = "Request body is empty -- expected raw Type B text."
+        return (jsonify({"error": error}), 400) if respond_as_json else (error, 400)
+ 
+    try:
+        message = parse_booking_message(raw)
+    except (EnvelopeParseError, ElementParseError, CrossReferenceError) as e:
+        return (jsonify({"error": str(e)}), 400) if respond_as_json else (str(e), 400)
+ 
+    if decision is None:
+        decision = ReplyDecision.confirm_all(
+            message.segments, reply_date_time_raw=_current_ddhhmm()
+        )
+ 
+    try:
+        reply = generate_booking_confirm_reply(message, decision)
+    except (ReplyGenerationError, ReplyEnvelopeError, ReplyRuleError) as e:
+        return (jsonify({"error": str(e)}), 400) if respond_as_json else (str(e), 400)
+ 
+    if respond_as_json:
+        return jsonify({"reply": reply})
+    return reply, 200, {"Content-Type": "text/plain"}
 
 
 if __name__ == "__main__":

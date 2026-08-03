@@ -124,3 +124,15 @@ def parse_segment_element(line: str) -> SegmentElement:
         departure_time_raw=departure_time_raw,
         arrival_time_raw=arrival_time_raw,
     )
+
+def render_segment_element(segment: SegmentElement) -> str:
+    first = (
+        f"{segment.airline_code}{segment.flight_number}"
+        f"{segment.reservation_booking_designator}{segment.date_raw}"
+    )
+    city_pair = f"{segment.board_point}{segment.off_point}"
+    action = f"{segment.action_code}{segment.number_in_party}"
+    tokens = [first, city_pair, action]
+    if segment.departure_time_raw and segment.arrival_time_raw:
+        tokens += [segment.departure_time_raw, segment.arrival_time_raw]
+    return " ".join(tokens)

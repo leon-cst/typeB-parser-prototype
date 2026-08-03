@@ -99,6 +99,7 @@ def parse_booking_message(raw: str) -> BookingMessage:
     return BookingMessage(
         envelope=envelope,
         passengers=passengers,
+        name_elements=name_elements,
         segments=segments,
         warnings=warnings,
         unrecognized_lines=unrecognized,

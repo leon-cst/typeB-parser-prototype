@@ -328,3 +328,26 @@ def parse_name_reference(token: str) -> NameReference:
         given_name=given_name,
         title=title,
     )
+
+def render_name_element(name: NameElement) -> str:
+    if name.is_group_placeholder:
+        return f"{name.number_in_party}{name.surname}"
+ 
+    if name.uses_distinct_surnames:
+        chunks = []
+        for person in name.people:
+            piece = person.surname or ""
+            if person.given_name:
+                piece = f"{piece}/{person.given_name}"
+            if person.title:
+                piece = f"{piece}/{person.title}"
+            chunks.append(piece)
+        return f"{name.number_in_party}{'/'.join(chunks)}"
+ 
+    tokens = []
+    for person in name.people:
+        given = person.given_name or ""
+        tokens.append(f"{given}{person.title}" if person.title else given)
+    for modifier in name.seat_modifiers:
+        tokens.append(modifier)
+    return f"{name.number_in_party}{name.surname}/{'/'.join(tokens)}"

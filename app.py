@@ -121,15 +121,17 @@ def reply_message():
  
     2. application/json -- body is
            { "message": "<raw text>", "decision": {...} }
-       for full control over the reply outcome and timestamp.
- 
-    Currently only the REQ03 section 19 booking-confirm case is wired
-    up (generate_booking_confirm_reply) -- see typeb/reply/cases/ for
-    adding more cases and a real dispatcher once there's more than one.
+       for full control over the reply outcome and timestamp. Response
+       includes reply_parsed -- the generated reply run back through
+       parse_booking_message, both as a convenience (callers who want
+       the structured view don't need a second request) and as a
+       built-in sanity check (a malformed render surfaces as a 500
+       instead of shipping broken Type B text silently).
  
     Response:
       text/plain in  -> text/plain out (the raw reply text)
-      application/json in -> { "reply": "<raw reply text>" }
+      application/json in -> { "reply": "<raw reply text>",
+                                "reply_parsed": {...} }
     """
     content_type = (request.content_type or "").split(";")[0].strip()
  
@@ -175,9 +177,20 @@ def reply_message():
     except (ReplyGenerationError, ReplyEnvelopeError, ReplyRuleError) as e:
         return (jsonify({"error": str(e)}), 400) if respond_as_json else (str(e), 400)
  
-    if respond_as_json:
-        return jsonify({"reply": reply})
-    return reply, 200, {"Content-Type": "text/plain"}
+    if not respond_as_json:
+        return reply, 200, {"Content-Type": "text/plain"}
+ 
+    try:
+        reply_parsed = parse_booking_message(reply)
+    except (EnvelopeParseError, ElementParseError, CrossReferenceError) as e:
+        return jsonify({
+            "error": f"Generated reply failed to re-parse (internal "
+                     f"render bug, please report): {e}",
+            "reply": reply,
+        }), 500
+ 
+    return jsonify({"reply": reply, "reply_parsed": reply_parsed.model_dump()})
+
 
 
 if __name__ == "__main__":

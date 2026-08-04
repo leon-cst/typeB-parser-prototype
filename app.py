@@ -1,15 +1,6 @@
 """
 Type B Parser -- Variant B (foundation-first rebuild)
 
-Built alongside the original app.py described in typeb_parser_handoff.md,
-for direct comparison. Scope right now: AVN, RVR, and booking-hold
-messages -- see typeb/tables/data/message_identifiers.yaml for what's
-recognized vs. what's actually implemented (meta.supported).
-
-Run:
-    python app.py
-
-Test with Hoppscotch against http://localhost:5000
 """
 from flask import Flask, jsonify, request
 
@@ -37,14 +28,11 @@ from typeb.reply.rules import ReplyRuleError
 app = Flask(__name__)
 
 # Load + validate every reference table at import time, not on first
-# request. If a YAML table is malformed, we want the app to refuse to
-# start rather than fail confusingly on whichever request touches the
-# bad table first.
+# request. If a YAML table is malformed, we want the app to refuse to start
 _TABLES = loader.load_all()
 
 # Dispatch table: envelope.effective_identifier -> orchestrator function.
-# Each orchestrator takes raw Type B text and returns a frozen Pydantic
-# message model.
+# Each orchestrator takes raw Type B text and returns a frozen Pydantic message model
 _ORCHESTRATORS = {
     "BOOKING": parse_booking_message,
     "AVN": parse_availability_message,
@@ -75,7 +63,7 @@ def parse_message():
     BOOKING type when there's no identifier line).
 
     Body: raw Type B text (Content-Type: text/plain), not JSON.
-    Scope right now: AVN, RVR, and booking-hold messages only.
+    Scope right now: AVN, RVR, booking-hold and booking-issued messages only.
     """
     raw = request.get_data(as_text=True)
     if not raw or not raw.strip():
@@ -112,21 +100,13 @@ def parse_message():
 def reply_message():
     """Generate a Type B reply from a Type B request.
  
-    Two ways to call this, dispatched by Content-Type:
+    Two ways to call, by Content-Type:
  
-    1. text/plain -- body is just the raw Type B request text. Always
-       defaults to ReplyDecision.confirm_all() (every segment -> KK),
-       with the reply timestamp set to the current time. Convenient for
-       manual/quick testing; no way to specify TK/UC/etc.
+    1. text/plain -- body is just the raw Type B request text.
  
     2. application/json -- body is
            { "message": "<raw text>", "decision": {...} }
-       for full control over the reply outcome and timestamp. Response
-       includes reply_parsed -- the generated reply run back through
-       parse_booking_message, both as a convenience (callers who want
-       the structured view don't need a second request) and as a
-       built-in sanity check (a malformed render surfaces as a 500
-       instead of shipping broken Type B text silently).
+       for full control over the reply outcome and timestamp.
  
     Response:
       text/plain in  -> text/plain out (the raw reply text)

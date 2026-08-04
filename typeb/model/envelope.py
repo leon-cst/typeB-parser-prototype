@@ -2,21 +2,14 @@
 Domain models for the envelope layer: Address, CommReference,
 RecordLocator, Envelope.
 
-These are frozen (immutable) Pydantic models -- an envelope, once parsed,
-shouldn't be mutated in place. If a transform is needed (e.g. building a
-reply's envelope from a request's), build a new model with
-`.model_copy(update={...})` rather than assigning to fields.
 """
 from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
 # REQ03 p.9-10, "POS CONSTRUCTIONS": the 10 point-of-sale sub-fields, in
-# the order the spec lists them. Fields 1-4 are described as mandatory,
-# 5-10 as optional/conditional, but real traffic doesn't always include
-# every field even when POS is present -- so a line can supply anywhere
-# from 0 to 10 of these, in this fixed order, and any not present are
-# left as None rather than guessed at.
+# the order the spec lists them. Order is currently fixed (which could mean incorrect)
+# Confirm, then revisit and fix.
 _POS_FIELD_NAMES = (
     "travel_agent_city_code",  # 1: in-house travel agent / TA city code
     "iata_number",             # 2: travel agent user ID (IATA) number
@@ -36,10 +29,6 @@ class Address(BaseModel):
     function code + 2-3 char airline/CRS designator.
     REQ03 section 2 (p.4) and section 4 "Communication Reference Element".
 
-    Note: this is NOT the same shape as a record locator's "booking
-    office" token (REQ03 p.9), which omits the office-function code
-    entirely (city + airline/CRS only, slash-prefixed if 3 chars). See
-    RecordLocator below for that shape.
     """
     model_config = ConfigDict(frozen=True, str_strip_whitespace=True, str_to_upper=True)
 
@@ -67,10 +56,7 @@ class Address(BaseModel):
 
 
 class CommReference(BaseModel):
-    """Communication reference element: '.' + origin address + date/time
-    group. REQ03 section 4 (p.6). Kept as a raw string for the date/time
-    portion -- Type B's ddhhmm format has no month/year, so building a
-    real datetime would mean guessing context we don't have here."""
+    """Communication reference element: '.' + origin address + date/time group."""
     model_config = ConfigDict(frozen=True, str_strip_whitespace=True, str_to_upper=True)
 
     origin: Address
@@ -84,30 +70,8 @@ class RecordLocator(BaseModel):
     CONSTRUCTIONS".
 
     Shape: "<booking_office> <location_of_record>[/pos_field]*"
-    e.g. "NYC1G CPNR1G/AAA/111122223333/NYC/1G/NL/CHF/SU" (REQ03 p.49).
+    e.g. "NYC1G CPNR1G/AAA/111122223333/NYC/1G/NL/CHF/SU".
 
-    `booking_office` and `location_of_record` are kept as raw strings,
-    not further decomposed -- REQ03 doesn't give a fixed-width grammar
-    for either (booking office is city/airport code + 2-3 char CRS/
-    airline designator, but the designator length varies; location of
-    record is a free-form PNR code) and Address.parse()'s shape doesn't
-    apply here (see its docstring).
-
-    POS sub-fields are filled strictly positionally, left to right: the
-    Nth slash-delimited value found always maps to the Nth POS field
-    (travel_agent_city_code, iata_number, city_airport_code, crs_code,
-    user_type, iso_country_code, iso_currency_code, duty_code,
-    user_id_pss, point_of_departure, in that order). Fields beyond
-    however many values are present resolve to None. There is no
-    attempt to detect or skip a field that's semantically "missing" in
-    the middle of the sequence (e.g. a two-letter value landing in
-    user_type, which REQ03 defines as single-letter A/E/N/T) -- nothing
-    on the wire marks a field as skipped unless it's an explicit empty
-    slash segment ("//"), so guessing at a shift would be exactly the
-    kind of structural-ambiguity guess this project avoids. A field can
-    only be absent by being omitted from the END of the line, matching
-    REQ03's own "if POS is not available, still insert with slash"
-    framing for trailing empties (see the BPR example's "/////" tail).
     """
     model_config = ConfigDict(frozen=True, str_strip_whitespace=True, str_to_upper=True)
 
@@ -170,9 +134,6 @@ class Envelope(BaseModel):
     """The parsed envelope: address block, communication reference,
     optional message identifier, optional record locator line(s).
 
-    `record_locators` holds 0, 1 (primary only), or 2 (primary +
-    secondary, REQ03 p.9's bilateral-agreement rule) RecordLocator
-    entries, in the order they appeared on the wire.
     """
     model_config = ConfigDict(frozen=True, str_strip_whitespace=True, str_to_upper=True)
 

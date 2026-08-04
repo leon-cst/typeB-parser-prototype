@@ -3,24 +3,6 @@ Generic cross-reference layer: matches OSI/SSR name-references back to
 the Person they describe (from a NAME element), and merges every
 attribute scattered across multiple lines (email, DOB, FOID, child/
 infant status, seat modifiers) into one BookingPassenger per person.
-
-Deliberately generic, not booking-specific: this operates purely on
-NameElement/NameReference data, not on anything booking-message-
-specific, so any future message type built on the same element
-vocabulary (DVD, ASC, TLR, ...) can reuse it directly rather than
-needing its own copy.
-
-Matching key: (surname, given_name, title) -- the only thing the wire
-format gives us to link a NAME line's Person to an OSI/SSR reference,
-since there's no ID number connecting them. This is fragile by
-construction (a typo, or a title present on one line and missing on
-another, silently breaks the match), so this module raises loudly on
-ambiguity rather than guessing, per explicit instruction:
-  - two different people resolving to the same (surname, given_name,
-    title) key -- can't tell which one a later reference means
-  - an OSI/SSR reference that matches no one at all
-  - conflicting passenger-type signals for the same person (e.g. one
-    line says CHD, another says INF for the same key)
 """
 from __future__ import annotations
 
@@ -73,10 +55,8 @@ def cross_reference_passengers(
         if ne.is_group_placeholder:
             continue
         for person in ne.people:
-            # Person.surname is only set under Logic B (distinct
-            # surnames) -- see typeb.model.elements.Person's docstring.
-            # Under Logic A (shared surname), it's None, meaning "use
-            # the NameElement's own surname" as before.
+            # Person.surname is only set under Logic B (distinct surnames)
+            # Under Logic A (shared surname), it's None, meaning "use the NameElement's own surname" as before.
             person_surname = person.surname if person.surname else ne.surname
             key = _passenger_key(person_surname, person.given_name, person.title)
             if key in pool:
@@ -101,7 +81,7 @@ def cross_reference_passengers(
     for element in contact_elements:
         name_ref = getattr(element, "name", None)
         if name_ref is None:
-            continue  # e.g. SSR FOID with no name attached -- nothing to link
+            continue  # e.g. SSR FOID with no name attached, means nothing to link
 
         key = _passenger_key(name_ref.surname, name_ref.given_name, name_ref.title)
         record = pool.get(key)

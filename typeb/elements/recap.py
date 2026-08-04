@@ -1,32 +1,6 @@
 """
 RVR recap request line parser.
 
-Two shapes documented in REQ02 pages 12-14 (RVR has no worked examples
-in REQ03 at all -- only a one-line mention in the identifier table on
-p.8; the earlier attribution to "REQ03 p.13" in this codebase was wrong
-and has been corrected):
-
-  Date-range shape (p.13): '<airline><flight>/<start>-<end>/<frequency>'
-    e.g. "8G407/16JUN26-30DEC26/1234567" -- 2 '/' characters, no spaces.
-
-  Single-date shape (p.14, two concrete worked examples in one message):
-    '<airline><flight>/<date> [<citypair>]'
-    e.g. "8G123/16JUN26 CGKSIN" -- 1 '/' character, optional space +
-    route. Route may be omitted entirely (REQ02 p.13: "Route tidak
-    perlu di isi (berarti all)") -- represented as the literal string
-    "ALL", not an error.
-
-Dispatched by '/' count: 2 slashes -> date-range shape, 1 slash ->
-single-date shape. This is a reliable structural signal because the
-two shapes never overlap in the worked examples -- the date-range shape
-has no spaces at all, while the single-date shape's date and route are
-space-separated. Anything else raises rather than guessing.
-
-A third, more ambiguous case exists in the doc (p.13's "BPTOPT"
-placeholder example, hinting at a possible date-only-no-route form with
-some other/no separator) but the only "example" of it uses schematic
-placeholder text, not a concrete transmitted line -- not built here;
-see typeb.model.elements.RecapSingleDateLine's docstring.
 """
 from __future__ import annotations
 

@@ -1,11 +1,6 @@
 """
 OSI element parser.
 
-REQ03 section 13 (p.22-23): 'OSI <airline> <service info...> [<name>]'.
-Unlike SSR, there's no fixed "code" token position -- the shape varies by
-sub-type. Dispatches by inspecting the line's tokens rather than a fixed
-position:
-
   - last token starts with "E/"   -> email (shared with SSR, see
     typeb.elements.contact)
   - last token starts with "DOB/" -> date of birth (shared with SSR)

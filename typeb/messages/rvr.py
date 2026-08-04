@@ -2,14 +2,7 @@
 RVR (availability recap request) message orchestrator: raw Type B text
 in, one RecapMessage out.
 
-Simpler than booking -- an RVR body is a flat list of one element shape
-(RecapDateRangeLine or RecapSingleDateLine), no passengers, no
-cross-referencing needed.
-
-Same malformed-vs-unrecognized policy as booking/AVN: a malformed
-RECAP_LINE fails the whole message; NAME/SEGMENT/SSR/OSI/AVAILABILITY_LINE
-shapes are treated as a structural anomaly (hard fail) rather than
-unimplemented; a genuinely unclassifiable line is collected instead.
+Same malformed-vs-unrecognized policy as booking/AVN
 """
 from __future__ import annotations
 

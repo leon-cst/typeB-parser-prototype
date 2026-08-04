@@ -11,26 +11,6 @@ real message field-for-field. The automated format (NSST, SMSW, BIKE,
 meal codes, etc.) is real and well-specified but not needed for current
 scope and not built yet.
 
-SSR INFT / SSR CHLD don't match either official format -- REQ03 section
-9 mentions both codes exist but never gives a worked example of their
-wire format, which is a real gap in the source document. Built directly
-against a real message's shape instead (see SsrChildOrInfantFlagElement's
-docstring).
-
-A FOURTH shape, confirmed real: SSR can carry email/DOB contact info with
-NO 4-letter code at all -- "SSR 8G 1ANGGARA/BAYIBUDI/MR E/BAYI1@GMAIL.COM"
--- identical in content to the OSI email/DOB shape, differing only in
-whether the sender wants an acknowledgement (SSR) or not (OSI). This is
-why the email/DOB parsing lives in typeb.elements.contact, shared by both
-dispatchers rather than duplicated.
-
-Dispatch order matters: a known 4-letter SSR code is checked FIRST, and
-only once that's ruled out does this fall back to checking the code-less
-email/DOB shape -- airline codes are always 2-3 characters, never 4, so
-there's no real ambiguity between "this is a code" and "this is an
-airline code," but checking code first is the more conservative order.
-An SSR code with no implemented parser raises clearly rather than
-silently skipping or mis-parsing it -- see ElementParseError message.
 """
 from __future__ import annotations
 
@@ -117,8 +97,6 @@ def parse_ssr_line(line: str):
     if handler is not None:
         return handler(stripped, tokens)
 
-    # Not a known 4-letter code -- check the code-less email/DOB shape
-    # before giving up (see module docstring).
     rest_tokens = tokens[1:]  # everything after "SSR"
     if is_email_shape(rest_tokens):
         return parse_email_contact(stripped, "SSR", rest_tokens)

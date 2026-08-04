@@ -1,32 +1,15 @@
 """
-Input normalization -- handles safe, unambiguous formatting noise before
+Input normalization: handles safe, unambiguous formatting noise before
 any structural parsing happens.
 
-Deliberately does NOT attempt to resolve genuine structural ambiguity
-(glued vs. spaced fields, missing digits, OCR-style corruption). See the
-module-level docstring on parse_envelope() for why -- in short, REQ02/
-REQ03 attribute that kind of variation to bilateral agreement between
-specific senders, so guessing at it here would mean silently producing a
-plausible-looking but potentially wrong parse. That's handled later by
-per-partner profiles, once we actually know who's sending, not by
-blanket coercion applied to everyone.
+Every change is logged.
 
-What this module DOES fix is safe because it's unambiguous:
+Types of safe ambiguity resolved by this module:
+  - CRLF/CR line endings -> LF
+  - Leading/trailing whitespace per line
+  - Lowercase -> uppercase
+  - Fully blank lines.
 
-  - CRLF/CR line endings -> LF: a transmission/copy-paste artifact,
-    never semantically meaningful.
-  - Leading/trailing whitespace per line: Type B has no semantic use for
-    padding; REQ03's line-length limit counts content, not padding.
-  - Lowercase -> uppercase: REQ03 section 3 states the allowed character
-    set is A-Z, 0-9, '/', '-', '.' only. Lowercase is never valid Type B,
-    so correcting it can't lose information the way, say, guessing a
-    glued field boundary could.
-  - Fully blank lines: never carry meaning; typically copy-paste padding.
-
-Every change is logged, not applied silently -- nothing here should be
-invisible if someone later needs to know a message needed correcting
-(e.g. to notice a partner integration is consistently sending lowercase
-and should be fixed at the source, even though we recovered from it).
 """
 from __future__ import annotations
 

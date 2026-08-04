@@ -10,10 +10,7 @@ from typeb.model.envelope import Envelope
 
 
 class RecapMessage(BaseModel):
-    """RVR body has no passengers or cross-referencing -- just a flat
-    list of recap lines, one per requested flight. Each line is one of
-    two documented shapes (RecapDateRangeLine or RecapSingleDateLine) --
-    see typeb.elements.recap's module docstring for the distinction."""
+
     model_config = ConfigDict(frozen=True)
 
     envelope: Envelope

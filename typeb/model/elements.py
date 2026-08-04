@@ -1,24 +1,6 @@
 """
 Domain models for the element layer.
 
-Four element shapes for current scope (AVN, RVR, booking):
-  - NameElement            (booking)
-  - SegmentElement         (booking) -- glued flight/class/date, per
-                            REQ03 p.9-10
-  - AvailabilityLine       (AVN body) -- SPACED flight/class/date, per
-                            REQ02 p.7-8
-  - RecapRequestLine       (RVR body) -- '/'-delimited, per REQ03 p.13
-
-Note AvailabilityLine and SegmentElement are genuinely different shapes,
-not two names for the same thing: booking SEGMENT lines glue airline +
-flight number + RBD + date into one token ("8G083F24SEP"), while AVN
-lines space them out ("AA800 F 01JUN"). This isn't an inconsistency to
-resolve -- it's the same "bilateral agreement" formatting variation
-flagged throughout REQ02/REQ03, just landing differently across two
-different message families that happen to both be in scope right now.
-
-All frozen, like the envelope models -- construct a new one rather than
-mutating in place.
 """
 from __future__ import annotations
 
@@ -26,20 +8,8 @@ from pydantic import BaseModel, ConfigDict
 
 
 class Person(BaseModel):
-    """One individual within a NAME element's party. REQ03 section 9's
-    "3FORD/E/B/C" example is a shared-surname group: one Person per
-    given-name token, all sharing the group's surname. Only the LAST
-    person in a shared-surname group can carry a title -- that's the
-    only slot that grammar provides.
+    """One individual within a NAME element's party. Surname is None by default"""
 
-    surname is None by default, meaning "shares NameElement.surname"
-    (the shared-surname case above). It's set to a real value only for
-    the distinct-surnames shape -- e.g.
-    "2WIJAYA/RINAMAHARANI/MRS/SIREGAR/BAYIRINA/MSTR" is two people with
-    DIFFERENT surnames chained together, each fully spelled out, with
-    person boundaries found by scanning for titles rather than by a
-    fixed token count. See typeb.elements.name's docstring for the full
-    derivation of both shapes and why they need separate logic."""
     model_config = ConfigDict(frozen=True, str_strip_whitespace=True, str_to_upper=True)
 
     surname: str | None = None  # only set for the distinct-surnames shape
@@ -50,35 +20,7 @@ class Person(BaseModel):
 
 
 class NameElement(BaseModel):
-    """REQ03 section 9 "Name Element" (p.9-10): '<number in party>
-    <surname>/<given name tokens...>', where the LAST given-name token
-    may have a title glued onto it (e.g. "JEANMR"), and/or a further
-    standalone title token may follow (e.g. ".../EDWARDCHARLES/MR").
-
-    Also covers the group-placeholder shape ("6SEAMEN" -- a group booking
-    before individual passenger names are known): no '/' at all, no
-    people, just a number and a group name.
-
-    seat_modifiers holds EXST (extra seat, e.g. for an oversized
-    passenger) and/or CBBG (cabin baggage occupying its own seat) --
-    REQ03 p.11: "Mr. Albert Dooley need Extra seat" -> "2DOOLEY/ALBERTMR
-    /EXST". The "2" here is NOT two people -- it's one real person
-    (Dooley) plus one "phantom seat" for the extra seat itself, which is
-    why this needed its own handling in the parser rather than being
-    treated as a second person's given name. Only verified for a single
-    modifier attached to one person on a solo NAME line; a group line
-    with a modifier on a specific member isn't evidenced by any example
-    seen so far.
-
-    uses_distinct_surnames marks the OTHER multi-person shape (as
-    opposed to the shared-surname "3FORD/E/B/C" shape): each person
-    fully spelled out with their own surname, chained together, e.g.
-    "2WIJAYA/RINAMAHARANI/MRS/SIREGAR/BAYIRINA/MSTR". When true, `surname`
-    above is just the FIRST token structurally (not a shared value every
-    person uses) -- read each Person's own `.surname` instead. See
-    typeb.elements.name's module docstring for the full derivation of
-    why these need two separate parsing paths.
-    """
+    """REQ03 section 9 "Name Element" """
     model_config = ConfigDict(frozen=True, str_strip_whitespace=True, str_to_upper=True)
 
     raw: str
@@ -91,7 +33,7 @@ class NameElement(BaseModel):
 
 
 class SegmentElement(BaseModel):
-    """REQ03 p.9-10 booking-context flight segment:
+    """booking-context flight segment:
     '<airline><flight><rbd><date> <board><off> <action><count> [<dep> <arr>]'
     with the first field glued, e.g. "8G083F24SEP CGKDPS NN1 0910 1015"."""
     model_config = ConfigDict(frozen=True, str_strip_whitespace=True, str_to_upper=True)
@@ -111,7 +53,7 @@ class SegmentElement(BaseModel):
 
 
 class AvailabilityLine(BaseModel):
-    """REQ02 p.7-8 AVN body line, SPACED fields:
+    """AVN body line, SPACED fields:
     '<airline><flight> <rbd> <date> <board><off>' e.g. "AA800 F 01JUN CGKDPS"."""
     model_config = ConfigDict(frozen=True, str_strip_whitespace=True, str_to_upper=True)
 
@@ -125,19 +67,7 @@ class AvailabilityLine(BaseModel):
 
 
 class RecapDateRangeLine(BaseModel):
-    """RVR request line, date-range shape -- REQ02 p.13 (not REQ03;
-    corrected attribution -- RVR has no worked examples in REQ03 at
-    all, only a one-line mention in the identifier table):
-    '<airline><flight>/<start date>-<end date>/<frequency>' e.g.
-    "8G407/16JUN26-30DEC26/1234567".
-
-    The doc explains the third field directly below its own example:
-    "1234567 adalah day operate" -- day-of-week operating pattern
-    (1=Monday per the note). Kept as a raw digit string rather than
-    parsed further -- the doc doesn't specify an exact length constraint
-    (the one example happens to show all 7 days), so frequency_raw isn't
-    assumed to always be 7 characters.
-    """
+    """RVR request line, date-range shape """
     model_config = ConfigDict(frozen=True, str_strip_whitespace=True, str_to_upper=True)
 
     raw: str
@@ -148,19 +78,7 @@ class RecapDateRangeLine(BaseModel):
 
 
 class RecapSingleDateLine(BaseModel):
-    """RVR request line, single-date shape -- REQ02 p.14, confirmed by
-    two concrete (non-placeholder) worked examples in one real message:
-    '<airline><flight>/<date> <citypair>' e.g. "8G123/16JUN26 CGKSIN".
-
-    The route may be omitted entirely -- REQ02 p.13: "Route tidak perlu
-    di isi (berarti all)" (route doesn't need to be filled in, meaning:
-    all routes). `route` is the literal string "ALL" in that case,
-    rather than raising -- this is documented, expected behavior, not a
-    malformed line. A separate REQ02 example (p.13) shows a schematic
-    placeholder ("BPTOPT") in this position rather than a concrete
-    value, which is consistent with this reading but isn't itself a
-    literal transmittable example.
-    """
+    """RVR request line, single-date shape """
     model_config = ConfigDict(frozen=True, str_strip_whitespace=True, str_to_upper=True)
 
     raw: str
@@ -172,18 +90,7 @@ class RecapSingleDateLine(BaseModel):
 
 class NameReference(BaseModel):
     """A reference to a single already-declared passenger, as embedded
-    within an SSR or OSI line (e.g. the trailing
-    "-2KUSUMA/BUDISANTOSO/MR" in an SSR FOID line). Distinct from
-    NameElement/Person: a NAME line describes an entire party, but a
-    name-reference always points at exactly one individual -- even
-    though its leading digit (when present) does NOT reflect that; it
-    appears to carry over the referenced person's own original party
-    size from their NAME line rather than counting anything about this
-    reference. REQ03's own formal SSR field table (p.21) shows this
-    reference with no leading digit at all ("-RED/PITE"), while a worked
-    example directly above it includes one ("-1RED/PETER") -- another
-    documented inconsistency. leading_number is kept as an optional raw
-    field precisely because of this, not treated as a real count."""
+    within an SSR or OSI line. """
     model_config = ConfigDict(frozen=True, str_strip_whitespace=True, str_to_upper=True)
 
     raw: str
@@ -194,11 +101,7 @@ class NameReference(BaseModel):
 
 
 class SsrFoidElement(BaseModel):
-    """Non-automated SSR format (REQ03 p.21's official field table,
-    confirmed against a real message): 'SSR FOID <airline>
-    <action><count>/<structured text>-<name>' -- e.g.
-    "SSR FOID 8G HK1/8472910483756291-2KUSUMA/BUDISANTOSO/MR" carries a
-    passport/ID number for a passenger, linked by name."""
+
     model_config = ConfigDict(frozen=True, str_strip_whitespace=True, str_to_upper=True)
 
     raw: str
@@ -210,12 +113,7 @@ class SsrFoidElement(BaseModel):
 
 
 class SsrChildOrInfantFlagElement(BaseModel):
-    """SSR INFT / SSR CHLD. REQ03 section 9 mentions these codes exist
-    but never gives a worked format example -- a real gap in the source
-    document. Built directly against a real message's shape instead:
-    'SSR <code> <airline> <name>', with no action code or segment
-    reference at all -- simpler than either official SSR format, not a
-    variant of them."""
+
     model_config = ConfigDict(frozen=True, str_strip_whitespace=True, str_to_upper=True)
 
     raw: str
@@ -225,14 +123,7 @@ class SsrChildOrInfantFlagElement(BaseModel):
 
 
 class EmailContactElement(BaseModel):
-    """Email contact info: '<SSR|OSI> <airline> <name> E/<email>'. This
-    shape is carried by BOTH element identifiers -- e.g.
-    "OSI GA 1BAMBANG/MR E/BABANG@GMAIL.COM" (REQ03 p.23) and
-    "SSR 8G 1ANGGARA/BAYIBUDI/MR E/BAYI1@GMAIL.COM" (a real message,
-    no 4-letter SSR code at all). Per REQ03 p.18, SSR vs OSI marks
-    whether the sender expects an acknowledgement (SSR) or is just
-    informing (OSI) -- `source` preserves that distinction rather than
-    collapsing both into one identical shape and losing it."""
+
     model_config = ConfigDict(frozen=True, str_strip_whitespace=True, str_to_upper=True)
 
     raw: str
@@ -243,12 +134,7 @@ class EmailContactElement(BaseModel):
 
 
 class DobElement(BaseModel):
-    """Date-of-birth info: '<SSR|OSI> <airline> <name> DOB/<date>'.
-    Same SSR/OSI duality as EmailContactElement -- see its docstring.
-    date_of_birth_raw is kept as-is rather than normalized -- REQ03's own
-    worked example uses a 4-digit year ("DOB/03JUL2026") while real
-    traffic seen so far uses 2-digit ("DOB/10MAY85"); not guessing which
-    convention a given sender means."""
+
     model_config = ConfigDict(frozen=True, str_strip_whitespace=True, str_to_upper=True)
 
     raw: str
@@ -259,13 +145,7 @@ class DobElement(BaseModel):
 
 
 class OsiPassengerTypeFlagElement(BaseModel):
-    """OSI CHD / OSI INF passenger-type flag (REQ03 p.22 official
-    examples: "OSI YY 1 CHD 1MARSH/E", "OSI YY 1 INF 1POPIV/O").
-    `unexplained_field` is the literal "1" that appears between the
-    airline code and CHD/INF in every example seen so far (spec's own
-    and real traffic) -- its meaning isn't explained anywhere in the
-    source document, so it's kept as an opaque raw field rather than
-    interpreted or named as if its purpose were known."""
+
     model_config = ConfigDict(frozen=True, str_strip_whitespace=True, str_to_upper=True)
 
     raw: str

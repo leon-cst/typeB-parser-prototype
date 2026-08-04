@@ -3,9 +3,7 @@ Availability line parser (AVN body).
 
 REQ02 p.7-8: '<airline><flight> <rbd> <date> <board><off>', fields
 SPACED, e.g. "AA800 F 01JUN CGKDPS". Not to be confused with booking
-SEGMENT lines, which glue the equivalent fields together -- see
-typeb.model.elements module docstring for why these are genuinely
-different shapes rather than one being a bug.
+SEGMENT lines, which glue the equivalent fields together.
 """
 from __future__ import annotations
 

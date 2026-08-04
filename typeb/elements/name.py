@@ -1,59 +1,13 @@
 """
 NAME element parser.
 
-REQ03 section 9 "Name Element" (p.9-10), reconstructed from the spec's
-worked examples (surname/title punctuation is deliberate, not typos):
-
-    1. "MR. JEAN DUVAL"                 -> 1DUVAL/JEANMR
-    2. "MR. EDWARD CHARLES JONES"       -> 1JONES/EDWARDCHARLES/MR
-    3. "MISS. DUVALIER"                 -> 1DUVALIER/MISS
-    4. "E FORD, B FORD, C FORD"         -> 3FORD/E/B/C
-    5. "MRS. B KHOWRY"                  -> 1KHOWRY/MRS
-
-These five encode ONE shape -- shared surname, one token per person --
-which this module calls Logic A: '<number in party><surname>/<given-name
-tokens...>', where the number of given-name tokens is either exactly
-`effective party count` (title glued onto or replacing the LAST
-person's token) or `effective party count + 1` (title as its own
-separate final token).
-
-A SECOND, distinct shape exists in real traffic: multiple people with
-DIFFERENT surnames chained onto one line, each fully spelled out --
-e.g. "2WIJAYA/RINAMAHARANI/MRS/SIREGAR/BAYIRINA/MSTR" (two people,
-different surnames) or the adult+infant packing seen elsewhere in this
-project, "2KUSUMA/BUDISANTOSO/MR/ANGGARA/BAYIBUDI/MR". This shape has no
-basis in REQ03's own worked examples -- it's built from real-world
-usage, confirmed by the person composing this instruction. This module
-calls it Logic B: person boundaries are found by scanning for titles
-(standalone token OR glued suffix, e.g. "KEVINMR") rather than by a
-fixed token count. Whatever accumulated since the last boundary becomes
-one person, with the FIRST token of that chunk as their surname and the
-rest as given name. A final person with no title at all is allowed,
-closed by end-of-input rather than by finding a title (same as Logic
-A's last-person-may-be-untitled allowance).
-
-Logic A is ALWAYS tried first. It only "declines" (returns None) rather
-than raising when the token count doesn't fit its shape -- every case
-Logic A already handles has a token count that satisfies it, so Logic B
-is never attempted for those; it only runs when Logic A's structural
-precondition fails. If NEITHER logic produces a person count matching
-the line's own number_in_party, the line raises rather than guessing --
-this is what catches genuinely unclassifiable variants (e.g. 3 people
-where 2 share a surname and 1 doesn't, mixing both shapes in one line --
-not evidenced by any example seen so far, so not built).
-
-Single-letter initials being silently dropped (example 5: "B" from
-"MRS. B KHOWRY" simply never appears) happens upstream, when the message
-is composed -- there is nothing for this parser to detect or reconstruct;
-by the time text reaches us, "1KHOWRY/MRS" is already complete and final.
-
 NOT implemented here (explicitly deferred, not silently ignored):
   - Continuation lines (a NAME line exceeding 69 chars repeats the
     leading number + group name on the next physical line)
   - EXST (extra seat) / CBBG (cabin bag) / JR / SR occupying the title
     slot within Logic B specifically (built for Logic A already)
   - Double-letter / space / hyphen collapsing in names (e.g. "ALI BABA"
-    -> "ALIBABA") -- this alters content, not just formatting, and isn't
+    -> "ALIBABA"), this alters content, not just formatting, and isn't
     implemented until the exact collapsing rule is confirmed
 """
 from __future__ import annotations

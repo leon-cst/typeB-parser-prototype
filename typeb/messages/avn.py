@@ -2,19 +2,6 @@
 AVN (availability numeric) message orchestrator: raw Type B text in, one
 AvailabilityMessage out.
 
-Simpler than booking -- an AVN body is a flat list of one element shape
-(AvailabilityLine), no passengers, no cross-referencing needed.
-
-Same malformed-vs-unrecognized policy as booking (see
-typeb.messages.booking's docstring for the full reasoning):
-  - a malformed AVAILABILITY_LINE fails the whole message
-  - NAME/SEGMENT/SSR/OSI/RECAP_LINE shapes appearing in an AVN body are
-    treated as a structural problem, not merely unimplemented -- every
-    worked AVN example in REQ02 contains only availability lines, so
-    booking-family content here is a genuine anomaly worth a hard,
-    specific failure rather than being silently collected
-  - a line the tokenizer can't classify at all (UNKNOWN) is collected
-    into unrecognized_lines instead
 """
 from __future__ import annotations
 

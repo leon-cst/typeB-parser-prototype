@@ -1,19 +1,10 @@
 """
 Shared email/DOB contact-info parsing.
 
-Confirmed real: both SSR and OSI carry this identical shape --
-REQ03 p.18 says SSR vs OSI marks whether the sender expects an
-acknowledgement (SSR) or is just informing (OSI), not a structural
-difference in the content itself. E.g.:
+    OSI GA 1BAMBANG/MR E/BABANG@GMAIL.COM
+    SSR 8G 1ANGGARA/BAYIBUDI/MR E/BAYI1@GMAIL.COM
 
-    OSI GA 1BAMBANG/MR E/BABANG@GMAIL.COM        (REQ03 p.23)
-    SSR 8G 1ANGGARA/BAYIBUDI/MR E/BAYI1@GMAIL.COM (real message, no
-                                                    4-letter SSR code)
-
-This module only handles what comes AFTER the leading 'SSR'/'OSI' token
--- callers strip that themselves before calling in, since each caller
-also needs to decide, using their own rules, whether this shape applies
-at all before handing off here.
+This module only handles what comes AFTER the leading 'SSR'/'OSI' token.
 """
 from __future__ import annotations
 

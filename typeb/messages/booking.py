@@ -1,28 +1,11 @@
 """
 Booking message orchestrator: raw Type B text in, one BookingMessage out.
 
-Malformed vs. unrecognized -- the policy this module implements:
+Malformed vs. unrecognized:
+    - Malformed is structurally wrong
+    - Unrecognized is structurally correct but the program fails to identify the line type
+    - Malformed lines will fail to parse, unrecognized lines are indicated in its own reply section
 
-  MALFORMED (fails the whole message, raises):
-    A line is a recognized shape but doesn't match its format -- e.g. an
-    SSR INFT line with the wrong token count, a NAME line that doesn't
-    fit the documented grammar, an envelope that can't be parsed at all.
-    These are data problems worth surfacing immediately and loudly; a
-    partial result built around one would be misleading, not helpful.
-
-  UNRECOGNIZED (collected into `unrecognized_lines`, does NOT fail
-  the message):
-    A line the tokenizer can't classify at all (ElementKind.UNKNOWN), or
-    one that IS a structurally valid SSR/OSI line but has no implemented
-    parser for its specific code/shape yet (UnrecognizedElementError --
-    see typeb.elements.errors). A real message containing one
-    out-of-scope SSR code (e.g. SSR MEAL, not yet built) shouldn't block
-    parsing everything else in it.
-
-The envelope itself is never "unrecognized" -- if parse_envelope can't
-make sense of the address/comm-reference/identifier/record-locator
-structure, that's always a hard failure, since nothing downstream can
-proceed without it.
 """
 from __future__ import annotations
 
@@ -67,9 +50,7 @@ def parse_booking_message(raw: str) -> BookingMessage:
             elif kind == ElementKind.MARKER:
                 continue  # NNNN / ARNK / '//' -- structural, not data-bearing
             elif kind in (ElementKind.AVAILABILITY_LINE, ElementKind.RECAP_LINE):
-                # These shapes belong to AVN/RVR bodies, not booking --
-                # seeing one here is a genuine structural problem, not
-                # merely something unimplemented.
+
                 raise ElementParseError(
                     f"Unexpected {kind.value} shape inside a booking "
                     f"message body: {line!r}"
@@ -86,9 +67,7 @@ def parse_booking_message(raw: str) -> BookingMessage:
             unrecognized.append(
                 UnrecognizedLine(raw=line, tokenizer_kind=kind.value, reason=str(e))
             )
-        # A plain ElementParseError is deliberately NOT caught here --
-        # it propagates and fails the whole message, per the policy
-        # above.
+
 
     passengers = cross_reference_passengers(name_elements, contact_elements)
 

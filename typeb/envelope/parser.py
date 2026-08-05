@@ -11,18 +11,37 @@ from typeb.envelope.normalize import normalize_message
 from typeb.model.envelope import Address, CommReference, Envelope, RecordLocator
 from typeb.tables import loader
 
-# name element = 1-3 digit "number in party" glued directly
+# REQ03 p.9-10: name element = 1-3 digit "number in party" glued directly
 # to the name/group text, no space (e.g. "1JOHN", "2SMITH", "25BALI/TOUR").
+# This is what distinguishes a NAME line from a record locator line, which
+# always starts with an alpha city/office code.
 _NAME_LINE_RE = re.compile(r"^\d{1,3}\S")
 
 _TERMINATORS = {"NNNN", "//"}
 
-
+# REQ03 section 3 / section 5: max line length including spaces. REQ02
+# section 9 states 68 for MAS specifically -- a documented inconsistency,
+# not reconciled here. See PartnerProfile (a later step) for making this
+# configurable instead of a single constant.
 _DEFAULT_MAX_LINE_LENGTH = 69
 
 
 class EnvelopeParseError(Exception):
     """Raised when the envelope structure can't be confidently parsed."""
+
+
+class LineTooLongError(EnvelopeParseError):
+    """69 characters including spaces, hard limit, checked per line"""
+
+
+def _check_line_lengths(lines: list[str]) -> None:
+    for line_number, line in enumerate(lines, start=1):
+        if len(line) > _DEFAULT_MAX_LINE_LENGTH:
+            raise LineTooLongError(
+                f"Line {line_number} is {len(line)} characters, exceeding "
+                f"the {_DEFAULT_MAX_LINE_LENGTH}-character limit (REQ03 "
+                f"section 3): {line!r}"
+            )
 
 
 def _looks_like_name_line(line: str) -> bool:
@@ -34,8 +53,13 @@ def _looks_like_terminator(line: str) -> bool:
 
 
 def parse_envelope(raw_message: str) -> tuple[Envelope, list[str]]:
+    """Parse the envelope portion of a raw Type B message.
 
+    Returns (envelope, remaining_body_lines) 
+    """
     lines = normalize_message(raw_message).lines
+    _check_line_lengths(lines)
+
     if len(lines) < 2:
         raise EnvelopeParseError(
             "Message too short to contain an envelope "
@@ -45,7 +69,7 @@ def parse_envelope(raw_message: str) -> tuple[Envelope, list[str]]:
 
     idx = 0
 
-    # Address block: priority code + one or more addresses
+    # --- Address block: priority code + one or more addresses ----------
     address_tokens = lines[idx].strip().split()
     if len(address_tokens) < 2:
         raise EnvelopeParseError(
@@ -59,7 +83,7 @@ def parse_envelope(raw_message: str) -> tuple[Envelope, list[str]]:
         raise EnvelopeParseError(f"Address line malformed: {e}") from e
     idx += 1
 
-    # Communication reference: ".<origin> <ddhhmm>" 
+    # --- Communication reference: ".<origin> <ddhhmm>" ------------------
     if idx >= len(lines) or not lines[idx].strip().startswith("."):
         got = lines[idx] if idx < len(lines) else "<end of message>"
         raise EnvelopeParseError(
@@ -83,13 +107,13 @@ def parse_envelope(raw_message: str) -> tuple[Envelope, list[str]]:
     comm_reference = CommReference(origin=origin, date_time_raw=date_time_raw)
     idx += 1
 
-    # Optional message identifier 
+    # --- Optional message identifier ------------------------------------
     message_identifier: str | None = None
     if idx < len(lines) and loader.is_known_message_identifier(lines[idx].strip()):
         message_identifier = lines[idx].strip()
         idx += 1
 
-    # Optional record locator (0, 1, or 2 lines)
+    # --- Optional record locator (0, 1, or 2 lines) ---------------------
     has_record_locator = loader.identifier_has_record_locator(
         message_identifier or "BOOKING"
     )

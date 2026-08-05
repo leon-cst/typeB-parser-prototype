@@ -79,22 +79,15 @@ NYC1G CPNR1G/AAA/111122223333/NYC/1G/NL/CHF/SU
     assert rl.raw == "NYC1G CPNR1G/AAA/111122223333/NYC/1G/NL/CHF/SU"
     assert rl.booking_office == "NYC1G"
     assert rl.location_of_record == "CPNR1G"
-    # POS fields are filled strictly positionally (field 1 -> field N for
-    # however many are present); nothing on the wire marks a field as
-    # skipped mid-sequence, so a value can only be "missing" by being
-    # absent from the END of the line, not the middle. Here "NL" lands
-    # in field 5 (user_type) purely by position, even though it doesn't
-    # match the spec's single-letter A/E/N/T user_type values -- that
-    # mismatch is a real observation about this message, not something
-    # the parser should silently correct by guessing a shift.
+    # POS fields are filled strictly positionally
     assert rl.travel_agent_city_code == "AAA"
     assert rl.iata_number == "111122223333"
     assert rl.city_airport_code == "NYC"
     assert rl.crs_code == "1G"
-    assert rl.user_type == "NL"
-    assert rl.iso_country_code == "CHF"
-    assert rl.iso_currency_code == "SU"
-    assert rl.duty_code is None
+    assert rl.user_type is None
+    assert rl.iso_country_code == "NL"
+    assert rl.iso_currency_code == "CHF"
+    assert rl.duty_code == "SU"
     assert rl.user_id_pss is None
     assert rl.point_of_departure is None
 
@@ -205,7 +198,7 @@ def test_record_locator_parse_directly():
     rl = RecordLocator.parse("NYC1G CPNR1G/AAA/111122223333/NYC/1G/NL/CHF/SU")
     assert rl.booking_office == "NYC1G"
     assert rl.location_of_record == "CPNR1G"
-    assert rl.iso_currency_code == "SU"  # 7th POS value, strictly positional
+    assert rl.iso_currency_code == "CHF"  # user_type skipped, values shift down one
 
 
 def test_record_locator_parse_missing_separator_raises():

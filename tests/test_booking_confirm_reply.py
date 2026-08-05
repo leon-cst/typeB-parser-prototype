@@ -15,6 +15,7 @@ def _build_booking_message(raw: str) -> BookingMessage:
         passengers=[],
         name_elements=name_elements,
         segments=segments,
+        airline_record_locators=[],
         warnings=[],
         unrecognized_lines=[],
     )

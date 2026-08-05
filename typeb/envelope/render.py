@@ -16,6 +16,9 @@ _POS_FIELD_NAMES = (
 )
 
 
+_USER_TYPE_INDEX = _POS_FIELD_NAMES.index("user_type")
+
+
 def render_address(address: Address) -> str:
     return f"{address.city_code}{address.office_code}{address.designator}"
 
@@ -26,7 +29,15 @@ def render_comm_reference(comm: CommReference) -> str:
 
 def render_record_locator(rl: RecordLocator) -> str:
     values = [getattr(rl, name) for name in _POS_FIELD_NAMES]
+
+    # Mirror RecordLocator.parse()'s user_type-omitted-without-a-slash
+    # rule: if user_type is None but a later field is present, drop it
+    # from the sequence entirely rather than emitting a placeholder "//".
+    if values[_USER_TYPE_INDEX] is None and any(v is not None for v in values[_USER_TYPE_INDEX + 1:]):
+        values.pop(_USER_TYPE_INDEX)
+
     while values and values[-1] is None:
         values.pop()
+
     pos_part = "".join(f"/{v or ''}" for v in values)
     return f"{rl.booking_office} {rl.location_of_record}{pos_part}"

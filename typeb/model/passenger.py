@@ -22,3 +22,4 @@ class BookingPassenger(BaseModel):
     email: str | None
     date_of_birth_raw: str | None
     foid: str | None
+    ticket_numbers: list[str] = []

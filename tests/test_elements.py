@@ -143,7 +143,7 @@ def test_name_still_raises_on_genuinely_unresolvable_mixed_shape():
     # 3 people where 2 share a surname (FORD) and 1 has their own
     # (SIREGAR) -- mixes both shapes in one line. Not evidenced by any
     # example seen so far, so this must still raise, not guess.
-    with pytest.raises(ElementParseError, match="Not confidently handled"):
+    with pytest.raises(ElementParseError, match="Refusing to guess"):
         parse_name_element("3FORD/E/B/SIREGAR/BAYIRINA/MSTR")
 
 

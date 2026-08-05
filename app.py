@@ -92,7 +92,7 @@ def parse_message():
         return jsonify({"error": str(e)}), 400
 
     return jsonify({
-        "data": message.model_dump(),
+        "data": message.model_dump(exclude = {"name_elements"}),
         "detected_msg_id": envelope.effective_identifier,
     })
 

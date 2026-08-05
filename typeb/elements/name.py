@@ -1,15 +1,3 @@
-"""
-NAME element parser.
-
-NOT implemented here (explicitly deferred, not silently ignored):
-  - Continuation lines (a NAME line exceeding 69 chars repeats the
-    leading number + group name on the next physical line)
-  - EXST (extra seat) / CBBG (cabin bag) / JR / SR occupying the title
-    slot within Logic B specifically (built for Logic A already)
-  - Double-letter / space / hyphen collapsing in names (e.g. "ALI BABA"
-    -> "ALIBABA"), this alters content, not just formatting, and isn't
-    implemented until the exact collapsing rule is confirmed
-"""
 from __future__ import annotations
 
 import re
@@ -20,14 +8,6 @@ from typeb.tables import loader
 
 _LEADING_DIGITS_RE = re.compile(r"^(\d{1,3})(.*)$")
 _OPTIONAL_LEADING_DIGITS_RE = re.compile(r"^(\d{1,3})?(.*)$")
-
-# REQ03 p.11: EXST (extra seat) / CBBG (cabin baggage occupying its own
-# seat) occupy a trailing slot on the NAME line, incrementing
-# number_in_party for a "phantom seat" that isn't a real person. Only
-# ONE modifier per line is evidenced (the DOOLEY/EXST example) -- support
-# for stacking more than one isn't built since there's nothing to verify
-# it against. Only handled in Logic A -- not evidenced in a Logic B
-# (distinct-surnames) context.
 _SEAT_MODIFIER_KEYWORDS = {"EXST", "CBBG"}
 
 
@@ -36,13 +16,6 @@ def _known_titles_longest_first() -> list[str]:
 
 
 def _split_glued_title(token: str) -> tuple[str | None, str | None]:
-    """Returns (leftover, title). If the whole token IS a known title
-    (nothing else attached), leftover is None -- REQ03 examples 3/5: no
-    first/middle name was given, the title occupies the whole slot. If
-    the token ends with a known title and has more before it, splits
-    them (example 1: "JEANMR" -> "JEAN" + "MR"). Longest-title-first so
-    "BAMBANGMRS" isn't wrongly split by matching the shorter "MR" first.
-    If nothing matches, returns the token unchanged with title=None."""
     for title in _known_titles_longest_first():
         if token == title:
             return None, title
@@ -54,11 +27,6 @@ def _split_glued_title(token: str) -> tuple[str | None, str | None]:
 def _try_parse_shared_surname(
     trailing: list[str], effective_party_count: int, known_titles: set[str]
 ) -> list[Person] | None:
-    """Logic A: one token per person (title glued onto or replacing the
-    last person's token), or one extra token for a standalone final
-    title -- e.g. "3FORD/E/B/C" or "1JONES/EDWARDCHARLES/MR". Returns
-    None (not an error) if the token count doesn't fit either shape --
-    the caller falls back to _try_parse_distinct_surnames."""
     if len(trailing) == effective_party_count + 1:
         given_name_tokens, title_token = trailing[:-1], trailing[-1]
         if title_token not in known_titles:
@@ -73,12 +41,8 @@ def _try_parse_shared_surname(
 
     if len(trailing) == effective_party_count:
         people = []
-        for i, token in enumerate(trailing):
-            is_last = i == len(trailing) - 1
-            if is_last:
-                given_name, title = _split_glued_title(token)
-            else:
-                given_name, title = token, None
+        for token in trailing:
+            given_name, title = _split_glued_title(token)
             people.append(Person(given_name=given_name, title=title))
         return people
 
@@ -94,24 +58,6 @@ def _chunk_to_person(chunk: list[str], title: str | None) -> Person:
 def _try_parse_distinct_surnames(
     full_sequence: list[str], effective_party_count: int
 ) -> list[Person] | None:
-    """Logic B: each person fully spelled out with their OWN surname,
-    chained together -- e.g.
-    "WIJAYA/RINAMAHARANI/MRS/SIREGAR/BAYIRINA/MSTR" (two people,
-    different surnames). Person boundaries are found by scanning every
-    token for a title (standalone, or glued as a suffix like "KEVINMR")
-    -- everything accumulated since the last boundary belongs to one
-    person, whose first token is their surname and the rest is given
-    name. A final person with no title is allowed, closed by
-    end-of-input.
-
-    Returns None (not an error) if the resulting person count doesn't
-    match effective_party_count -- this is the safety net that keeps
-    Logic B from silently misinterpreting a genuinely different or
-    mixed shape (e.g. a shared-surname group with no titles at all would
-    resolve to exactly 1 person here, which almost never matches the
-    declared count, and correctly falls through to raising instead of
-    being accepted).
-    """
     people: list[Person] = []
     chunk: list[str] = []
 
@@ -123,7 +69,7 @@ def _try_parse_distinct_surnames(
         if leftover:
             chunk.append(leftover)
         if not chunk:
-            return None  # a title with nothing accumulated -- not this shape
+            return None
         people.append(_chunk_to_person(chunk, title))
         chunk = []
 
@@ -137,24 +83,24 @@ def _try_parse_distinct_surnames(
 
 
 def parse_name_element(line: str) -> NameElement:
+    """Parse ONE name group. For a body line, use parse_name_line()
+    instead -- REQ03 p.10 allows several groups on a single line."""
     stripped = line.strip()
 
     m = _LEADING_DIGITS_RE.match(stripped)
     if not m:
         raise ElementParseError(
-            f"NAME line must start with 1-3 digit number in party: {line!r}"
+            f"NAME group must start with 1-3 digit number in party: {line!r}"
         )
     number_in_party = int(m.group(1))
     rest = m.group(2)
 
     if not rest:
         raise ElementParseError(
-            f"NAME line has a number in party but nothing after it: {line!r}"
+            f"NAME group has a number in party but nothing after it: {line!r}"
         )
 
     if "/" not in rest:
-        # Group-placeholder line, e.g. "6SEAMEN" -- no individual names
-        # known yet.
         return NameElement(
             raw=stripped,
             number_in_party=number_in_party,
@@ -169,15 +115,12 @@ def parse_name_element(line: str) -> NameElement:
     surname, trailing = parts[0], parts[1:]
 
     if not surname:
-        raise ElementParseError(f"NAME line missing surname before '/': {line!r}")
+        raise ElementParseError(f"NAME group missing surname before '/': {line!r}")
     if not trailing:
         raise ElementParseError(
-            f"NAME line has '/' but no given-name/title tokens after it: {line!r}"
+            f"NAME group has '/' but no given-name/title tokens after it: {line!r}"
         )
 
-    # Strip a trailing seat modifier (EXST/CBBG) before doing anything
-    # else -- it consumes one slot of number_in_party without describing
-    # a real person. Logic A only -- not evidenced for Logic B.
     seat_modifiers: list[str] = []
     if trailing and trailing[-1] in _SEAT_MODIFIER_KEYWORDS:
         seat_modifiers.append(trailing.pop())
@@ -185,12 +128,12 @@ def parse_name_element(line: str) -> NameElement:
     effective_party_count = number_in_party - len(seat_modifiers)
     if effective_party_count < 1:
         raise ElementParseError(
-            f"NAME line has more seat-modifier tokens ({seat_modifiers}) "
+            f"NAME group has more seat-modifier tokens ({seat_modifiers}) "
             f"than number_in_party={number_in_party} can account for: {line!r}"
         )
     if not trailing:
         raise ElementParseError(
-            f"NAME line has a seat modifier ({seat_modifiers}) but no "
+            f"NAME group has a seat modifier ({seat_modifiers}) but no "
             f"given-name/title tokens before it: {line!r}"
         )
 
@@ -206,15 +149,12 @@ def parse_name_element(line: str) -> NameElement:
 
     if people is None:
         raise ElementParseError(
-            f"NAME line has {len(trailing)} given-name/title tokens after "
+            f"NAME group has {len(trailing)} given-name/title tokens after "
             f"the surname (after removing any seat modifier), but the "
             f"effective party count is {effective_party_count} -- this "
             f"doesn't fit the shared-surname grammar ({effective_party_count} "
             f"or {effective_party_count + 1} tokens) or the "
-            f"distinct-surnames grammar (each person fully spelled out, "
-            f"boundaries found by titles). Not confidently handled -- "
-            f"refusing to guess rather than silently mis-parsing a "
-            f"possibly out-of-spec variant: {line!r}"
+            f"distinct-surnames grammar. Refusing to guess: {line!r}"
         )
 
     return NameElement(
@@ -228,12 +168,28 @@ def parse_name_element(line: str) -> NameElement:
     )
 
 
+def parse_name_line(line: str) -> list[NameElement]:
+    """REQ03 p.10: one NAME line may carry several space-separated name
+    groups, e.g. '1AAAAA/AMR 1BBBBB/BMR'. Each group must begin with its
+    own number in party."""
+    stripped = line.strip()
+    if not stripped:
+        raise ElementParseError("NAME line is empty")
+
+    groups = stripped.split()
+    for i, group in enumerate(groups):
+        if not _LEADING_DIGITS_RE.match(group) or group.rstrip("0123456789") == "":
+            raise ElementParseError(
+                f"NAME line token {i + 1} of {len(groups)} ({group!r}) does "
+                f"not begin a name group -- every space-separated group on "
+                f"a NAME line must start with its own 1-3 digit number in "
+                f"party, immediately followed by the name: {line!r}"
+            )
+
+    return [parse_name_element(g) for g in groups]
+
+
 def parse_name_reference(token: str) -> NameReference:
-    """Parse a name as embedded in an SSR or OSI line -- always exactly
-    one person, unlike parse_name_element's party-of-N grammar. See
-    NameReference's docstring for why this is a separate function rather
-    than a special case of parse_name_element: the leading digit here
-    (when present at all) doesn't count anything about this reference."""
     stripped = token.strip()
 
     m = _OPTIONAL_LEADING_DIGITS_RE.match(stripped)
@@ -242,8 +198,7 @@ def parse_name_reference(token: str) -> NameReference:
 
     if not rest or "/" not in rest:
         raise ElementParseError(
-            f"Name reference malformed, expected "
-            f"'[N]SURNAME/GIVEN[/TITLE]': {token!r}"
+            f"Name reference malformed, expected '[N]SURNAME/GIVEN[/TITLE]': {token!r}"
         )
 
     parts = rest.split("/")
@@ -264,15 +219,13 @@ def parse_name_reference(token: str) -> NameReference:
         given_name, title = trailing[0], trailing[1]
         if title not in known_titles:
             raise ElementParseError(
-                f"Name reference has 2 tokens after the surname, which "
-                f"only fits the grammar if the second is a standalone "
-                f"title -- got {title!r} in {token!r}"
+                f"Name reference has 2 tokens after the surname, which only "
+                f"fits the grammar if the second is a standalone title -- "
+                f"got {title!r} in {token!r}"
             )
     else:
         raise ElementParseError(
-            f"Name reference has {len(trailing)} tokens after the "
-            f"surname -- expected 1 (given name, title optionally glued) "
-            f"or 2 (given name + separate title token): {token!r}"
+            f"Name reference has {len(trailing)} tokens after the surname: {token!r}"
         )
 
     return NameReference(
@@ -283,10 +236,11 @@ def parse_name_reference(token: str) -> NameReference:
         title=title,
     )
 
+
 def render_name_element(name: NameElement) -> str:
     if name.is_group_placeholder:
         return f"{name.number_in_party}{name.surname}"
- 
+
     if name.uses_distinct_surnames:
         chunks = []
         for person in name.people:
@@ -297,7 +251,7 @@ def render_name_element(name: NameElement) -> str:
                 piece = f"{piece}/{person.title}"
             chunks.append(piece)
         return f"{name.number_in_party}{'/'.join(chunks)}"
- 
+
     tokens = []
     for person in name.people:
         given = person.given_name or ""

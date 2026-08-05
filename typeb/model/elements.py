@@ -153,3 +153,53 @@ class OsiPassengerTypeFlagElement(BaseModel):
     unexplained_field: str
     passenger_type: str  # "CHD" or "INF"
     name: NameReference
+
+class SsrTicketNumberElement(BaseModel):
+    """SSR TKNE (REQ03 section 18). segment_reference_raw is kept
+    undecomposed: the city pair / flight / RBD / date portion appears
+    glued, part-spaced and fully-spaced across the spec's own examples,
+    with no rule given for which applies when."""
+    model_config = ConfigDict(frozen=True, str_strip_whitespace=True, str_to_upper=True)
+ 
+    raw: str
+    airline_code: str
+    action_code: str | None
+    number_in_party: int | None
+    segment_reference_raw: str
+    name: NameReference | None
+    ticket_number_raw: str
+ 
+ 
+class SsrRecordLocatorElement(BaseModel):
+    """SSR RLOC -- the airline's own PNR code for a passive segment
+    (REQ03 section 17)."""
+    model_config = ConfigDict(frozen=True, str_strip_whitespace=True, str_to_upper=True)
+ 
+    raw: str
+    airline_code: str
+    action_code: str | None
+    number_in_party: int | None
+    segment_reference_raw: str
+    name: NameReference | None
+    record_locator: str
+ 
+ 
+class SsrGroupElement(BaseModel):
+    """SSR GRPS. REQ03 section 12 states action code and number in party
+    are optional for GRPS/MEDA/OTHS."""
+    model_config = ConfigDict(frozen=True, str_strip_whitespace=True, str_to_upper=True)
+ 
+    raw: str
+    airline_code: str
+    structured_text: str
+    group_name: str | None
+ 
+ 
+class OsiRecordLocatorElement(BaseModel):
+    """OSI ... RLOC ... -- REQ03 section 17's alternative to SSR RLOC."""
+    model_config = ConfigDict(frozen=True, str_strip_whitespace=True, str_to_upper=True)
+ 
+    raw: str
+    airline_code: str
+    record_locator_airline: str
+    record_locator: str

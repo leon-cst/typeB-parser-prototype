@@ -1,9 +1,3 @@
-"""
-Generic cross-reference layer: matches OSI/SSR name-references back to
-the Person they describe (from a NAME element), and merges every
-attribute scattered across multiple lines (email, DOB, FOID, child/
-infant status, seat modifiers) into one BookingPassenger per person.
-"""
 from __future__ import annotations
 
 from typing import Union
@@ -15,6 +9,7 @@ from typeb.model.elements import (
     OsiPassengerTypeFlagElement,
     SsrChildOrInfantFlagElement,
     SsrFoidElement,
+    SsrTicketNumberElement,
 )
 from typeb.model.passenger import BookingPassenger
 
@@ -24,19 +19,17 @@ ContactElement = Union[
     EmailContactElement,
     DobElement,
     OsiPassengerTypeFlagElement,
+    SsrTicketNumberElement,
 ]
 
 PassengerKey = tuple
 
 
 class CrossReferenceError(Exception):
-    """Raised on ambiguous or unmatched name-references. Never silently
-    guesses which passenger an element means -- see module docstring."""
+    pass
 
 
-def _passenger_key(
-    surname: str, given_name: str | None, title: str | None
-) -> PassengerKey:
+def _passenger_key(surname, given_name, title) -> PassengerKey:
     return (surname, given_name, title)
 
 
@@ -44,10 +37,6 @@ def cross_reference_passengers(
     name_elements: list[NameElement],
     contact_elements: list[ContactElement],
 ) -> list[BookingPassenger]:
-    """Build one BookingPassenger per real (non-placeholder) person
-    declared across `name_elements`, with every matching element in
-    `contact_elements` merged in. Order of the returned list follows the
-    order people first appear across the NAME elements."""
     pool: dict[PassengerKey, dict] = {}
     order: list[PassengerKey] = []
 
@@ -55,8 +44,6 @@ def cross_reference_passengers(
         if ne.is_group_placeholder:
             continue
         for person in ne.people:
-            # Person.surname is only set under Logic B (distinct surnames)
-            # Under Logic A (shared surname), it's None, meaning "use the NameElement's own surname" as before.
             person_surname = person.surname if person.surname else ne.surname
             key = _passenger_key(person_surname, person.given_name, person.title)
             if key in pool:
@@ -75,13 +62,14 @@ def cross_reference_passengers(
                 "email": None,
                 "date_of_birth_raw": None,
                 "foid": None,
+                "ticket_numbers": [],
             }
             order.append(key)
 
     for element in contact_elements:
         name_ref = getattr(element, "name", None)
         if name_ref is None:
-            continue  # e.g. SSR FOID with no name attached, means nothing to link
+            continue
 
         key = _passenger_key(name_ref.surname, name_ref.given_name, name_ref.title)
         record = pool.get(key)
@@ -116,6 +104,11 @@ def _apply_element(record: dict, element: ContactElement) -> None:
         new_type = "INF" if element.passenger_type == "INF" else "CHD"
         _set_passenger_type(record, new_type, element)
 
+    elif isinstance(element, SsrTicketNumberElement):
+        # One TKNE per passenger per segment (REQ03 section 18), so a
+        # passenger legitimately accumulates several.
+        record["ticket_numbers"].append(element.ticket_number_raw)
+
     else:
         raise CrossReferenceError(
             f"Don't know how to apply {type(element).__name__} to a "
@@ -138,13 +131,6 @@ def _set_passenger_type(record: dict, new_type: str, element: ContactElement) ->
 def validate_party_size(
     name_elements: list[NameElement], segment_number_in_party: int
 ) -> list[str]:
-    """Cross-check REQ03's own stated invariant (p.10): total number in
-    party across NAME elements should equal the flight segment's seat
-    count. Returns warning strings rather than raising -- REQ03 p.11
-    says infant-inclusion in number_in_party is bilateral-agreement-
-    dependent, so a mismatch can be legitimate, not necessarily an
-    error. Surfaces the discrepancy for a human (or later, a
-    PartnerProfile) to resolve rather than blocking the parse."""
     total_name_party = sum(
         ne.number_in_party for ne in name_elements if not ne.is_group_placeholder
     )

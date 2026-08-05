@@ -103,7 +103,7 @@ def test_crlf_and_extra_blank_lines_dont_break_booking_parse():
     assert envelope.record_locators[0].raw == (
         "NYC1G CPNR1G/AAA/111122223333/NYC/1G/NL/CHF/SU"
     )
-    assert envelope.record_locators[0].iso_currency_code == "SU"
+    assert envelope.record_locators[0].iso_currency_code == "CHF"
     assert body[0] == "1RAHARJO/BAMBANGMR"
 
 

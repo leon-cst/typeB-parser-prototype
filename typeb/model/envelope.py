@@ -23,6 +23,11 @@ _POS_FIELD_NAMES = (
     "point_of_departure",       # 10: point of departure, e.g. "CGK"
 )
 
+_USER_TYPE_INDEX = _POS_FIELD_NAMES.index("user_type")
+
+# EXPAND as needed
+_VALID_USER_TYPES = {"A", "E", "N", "T"}
+
 
 class Address(BaseModel):
     """A single Type B address: 3-char city/airport code + 2-char office
@@ -64,15 +69,7 @@ class CommReference(BaseModel):
 
 
 class RecordLocator(BaseModel):
-    """One record locator line: booking office + location of record,
-    optionally followed by up to 10 slash-delimited point-of-sale (POS)
-    sub-fields. REQ03 p.9-10, "RECORD LOCATOR ELEMENT" / "POS
-    CONSTRUCTIONS".
-
-    Shape: "<booking_office> <location_of_record>[/pos_field]*"
-    e.g. "NYC1G CPNR1G/AAA/111122223333/NYC/1G/NL/CHF/SU".
-
-    """
+    """One record locator line"""
     model_config = ConfigDict(frozen=True, str_strip_whitespace=True, str_to_upper=True)
 
     raw: str
@@ -116,11 +113,18 @@ class RecordLocator(BaseModel):
                 f"Record locator line missing location of record: {line!r}"
             )
 
-        pos_values = loc_and_pos[1:]
-        pos_fields = {
-            name: (value.strip() or None)
-            for name, value in zip(_POS_FIELD_NAMES, pos_values)
-        }
+        pos_values = [v.strip() or None for v in loc_and_pos[1:]]
+ 
+        # user_type omitted without a placeholder slash
+        if (
+            len(pos_values) > _USER_TYPE_INDEX
+            and pos_values[_USER_TYPE_INDEX] is not None
+            and pos_values[_USER_TYPE_INDEX] not in _VALID_USER_TYPES
+        ):
+            pos_values.insert(_USER_TYPE_INDEX, None)
+ 
+        pos_fields = dict(zip(_POS_FIELD_NAMES, pos_values))
+
 
         return cls(
             raw=raw,

@@ -9,12 +9,14 @@ number). All five CONTOH examples transcribed verbatim, except:
 """
 import pytest
 
+from typeb.elements.cross_reference import CrossReferenceError
 from typeb.elements.errors import ElementParseError
 from typeb.elements.name import parse_name_element, parse_name_line
 from typeb.elements.osi import parse_osi_line
 from typeb.elements.ssr import parse_ssr_line
 from typeb.messages.booking import parse_booking_message
 from typeb.model.envelope import RecordLocator
+from typeb.model.passenger import TicketNumberRecord
 
 
 # --------------------------------------------------------------------------
@@ -175,8 +177,12 @@ OSI NH RLOC NH CPNRNH"""
     msg = parse_booking_message(raw)
     assert msg.segments[0].action_code == "PL"
     by_given = {p.given_name: p for p in msg.passengers}
-    assert by_given["JXX"].ticket_numbers == ["2051234567890C1"]
-    assert by_given["ZYY"].ticket_numbers == ["2051234567891C1"]
+    assert by_given["JXX"].ticket_numbers == [
+        TicketNumberRecord(ticket_number="2051234567890C1", airline_code="NH", segments=["NRTLAX 0006Y21DEC"])
+    ]
+    assert by_given["ZYY"].ticket_numbers == [
+        TicketNumberRecord(ticket_number="2051234567891C1", airline_code="NH", segments=["NRTLAX 0006Y21DEC"])
+    ]
     assert msg.airline_record_locators == ["CPNRNH"]
     assert msg.unrecognized_lines == []
 
@@ -211,7 +217,10 @@ SSR RLOC NH NRTORD0012T21DEC.CPNRNH"""
     assert len(msg.passengers) == 5
     assert [s.action_code for s in msg.segments] == ["PU", "PU"]
     added = next(p for p in msg.passengers if p.surname == "ZZZZZ")
-    assert added.ticket_numbers == ["2051234567890C1", "2051234567891C2"]
+    assert added.ticket_numbers == [
+        TicketNumberRecord(ticket_number="2051234567890C1", airline_code="NH", segments=["NRTORD0002T21DEC"]),
+        TicketNumberRecord(ticket_number="2051234567891C2", airline_code="NH", segments=["ORDNRT0002T28DEC"]),
+    ]
     assert msg.airline_record_locators == ["CPNRNH"]
     assert msg.unrecognized_lines == []
 
@@ -227,6 +236,47 @@ SSR TKNE NH HK1 NRTLAX 0006Y21DEC-1AAAAA/TMR.2051234567890C1"""
     msg = parse_booking_message(raw)
     assert msg.segments[0].action_code == "PU"
     by_given = {p.given_name: p for p in msg.passengers}
-    assert by_given["T"].ticket_numbers == ["2051234567890C1"]
+    assert by_given["T"].ticket_numbers == [
+        TicketNumberRecord(ticket_number="2051234567890C1", airline_code="NH", segments=["NRTLAX 0006Y21DEC"])
+    ]
     assert by_given["BB"].ticket_numbers == []
+
+
+def test_same_ticket_number_across_two_segments_groups_into_one_record():
+    # A single e-ticket can legitimately cover more than one segment
+    # (REQ03 doesn't forbid the same ticket number appearing on separate
+    # TKNE lines) -- these must group into ONE TicketNumberRecord with
+    # both segment references, not appear as two indistinguishable
+    # entries.
+    raw = """\
+QU CGKRM8G
+.SINRMGDS 290947
+CPNR1G QFWKOX/8HH6/12345678/TYO/1F/T/JP/JPY
+1KUSUMA/BUDISANTOSOMR
+8G074E20AUG OECDIL HK1/1010 1045
+8G191E20AUG DILDPS HK1/2100 2240
+SSR TKNE NH OECDIL 0074Y21DEC-1KUSUMA/BUDISANTOSOMR.2051234567891C1
+SSR TKNE NH DILDPS 0191E20AUG-1KUSUMA/BUDISANTOSOMR.2051234567891C1"""
+    msg = parse_booking_message(raw)
+    assert len(msg.passengers) == 1
+    assert msg.passengers[0].ticket_numbers == [
+        TicketNumberRecord(
+            ticket_number="2051234567891C1",
+            airline_code="NH",
+            segments=["OECDIL 0074Y21DEC", "DILDPS 0191E20AUG"],
+        )
+    ]
     assert msg.unrecognized_lines == []
+
+
+def test_same_ticket_number_under_two_airlines_raises():
+    raw = """\
+QU CGKRM8G
+.SINRMGDS 290947
+CPNR1G QFWKOX/8HH6/12345678/TYO/1F/T/JP/JPY
+1KUSUMA/BUDISANTOSOMR
+8G074E20AUG OECDIL HK1/1010 1045
+SSR TKNE NH OECDIL 0074Y21DEC-1KUSUMA/BUDISANTOSOMR.2051234567891C1
+SSR TKNE AA OECDIL 0074Y21DEC-1KUSUMA/BUDISANTOSOMR.2051234567891C1"""
+    with pytest.raises(CrossReferenceError, match="under two airlines"):
+        parse_booking_message(raw)

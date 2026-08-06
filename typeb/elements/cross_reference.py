@@ -11,7 +11,7 @@ from typeb.model.elements import (
     SsrFoidElement,
     SsrTicketNumberElement,
 )
-from typeb.model.passenger import BookingPassenger
+from typeb.model.passenger import BookingPassenger, TicketNumberRecord
 
 ContactElement = Union[
     SsrFoidElement,
@@ -62,7 +62,7 @@ def cross_reference_passengers(
                 "email": None,
                 "date_of_birth_raw": None,
                 "foid": None,
-                "ticket_numbers": [],
+                "_ticket_number_groups": {},  # ticket_number -> {"airline_code": str, "segments": [...]}
             }
             order.append(key)
 
@@ -83,7 +83,20 @@ def cross_reference_passengers(
 
         _apply_element(record, element)
 
-    return [BookingPassenger(**pool[key]) for key in order]
+    return [_finalize_passenger(pool[key]) for key in order]
+
+
+def _finalize_passenger(record: dict) -> BookingPassenger:
+    ticket_groups = record.pop("_ticket_number_groups")
+    record["ticket_numbers"] = [
+        TicketNumberRecord(
+            ticket_number=ticket_number,
+            airline_code=group["airline_code"],
+            segments=group["segments"],
+        )
+        for ticket_number, group in ticket_groups.items()
+    ]
+    return BookingPassenger(**record)
 
 
 def _apply_element(record: dict, element: ContactElement) -> None:
@@ -105,9 +118,20 @@ def _apply_element(record: dict, element: ContactElement) -> None:
         _set_passenger_type(record, new_type, element)
 
     elif isinstance(element, SsrTicketNumberElement):
-        # One TKNE per passenger per segment (REQ03 section 18), so a
-        # passenger legitimately accumulates several.
-        record["ticket_numbers"].append(element.ticket_number_raw)
+        groups = record["_ticket_number_groups"]
+        group = groups.setdefault(
+            element.ticket_number_raw,
+            {"airline_code": element.airline_code, "segments": []},
+        )
+        if group["airline_code"] != element.airline_code:
+            raise CrossReferenceError(
+                f"Ticket number {element.ticket_number_raw!r} was "
+                f"already reported under airline "
+                f"{group['airline_code']!r}, but this line reports it "
+                f"under {element.airline_code!r} -- can't represent one "
+                f"ticket under two airlines. Line: {element.raw!r}"
+            )
+        group["segments"].append(element.segment_reference_raw)
 
     else:
         raise CrossReferenceError(

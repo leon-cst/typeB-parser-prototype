@@ -25,3 +25,6 @@ entries:
   - code: DR
     category: name_title
     description: Doctor
+  - code: INF
+    category: name_title
+    description: Infant

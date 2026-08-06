@@ -8,7 +8,7 @@ from typeb.tables import loader
 
 _LEADING_DIGITS_RE = re.compile(r"^(\d{1,3})(.*)$")
 _OPTIONAL_LEADING_DIGITS_RE = re.compile(r"^(\d{1,3})?(.*)$")
-_SEAT_MODIFIER_KEYWORDS = {"EXST", "CBBG"}
+_SEAT_MODIFIER_KEYWORDS = {"EXST", "CBBG"} # expand as needed
 
 
 def _known_titles_longest_first() -> list[str]:

@@ -167,8 +167,7 @@ def test_validate_party_size_mismatch_returns_warning_not_error():
     assert "requests 1 seat" in warnings[0]
 
 
-def test_validate_party_size_ignores_group_placeholders():
+def test_group_placeholder_contributes_to_party_size():
     names = [parse_name_element("6SEAMEN")]
-    # No real party size to check against a placeholder-only booking.
-    warnings = validate_party_size(names, segment_number_in_party=0)
-    assert warnings == []
+    # 6SEAMEN legitimately represents 6 seats -- matches a 6-seat segment
+    assert validate_party_size(names, segment_number_in_party=6) == []

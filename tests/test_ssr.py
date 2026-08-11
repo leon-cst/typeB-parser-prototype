@@ -6,7 +6,7 @@ format example for either.
 """
 import pytest
 
-from typeb.elements.errors import ElementParseError
+from typeb.elements.errors import ElementParseError, UnrecognizedElementError
 from typeb.elements.ssr import parse_ssr_line
 
 
@@ -90,8 +90,8 @@ def test_ssr_inft_wrong_token_count_raises():
 
 
 def test_ssr_unimplemented_code_raises_clearly():
-    with pytest.raises(ElementParseError, match="No parser implemented yet for SSR code 'NSST'"):
-        parse_ssr_line("SSR NSST LH NN1 FRAMXP17452 0NOV-1SCHULTZ/LEO")
+    with pytest.raises(UnrecognizedElementError, match="No parser implemented yet for SSR code 'ZZZZ'"):
+        parse_ssr_line("SSR ZZZZ TW NN1 SOMETHING")
 
 
 def test_ssr_foid_leading_digit_not_mistaken_for_party_count():

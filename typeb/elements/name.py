@@ -8,7 +8,7 @@ from typeb.tables import loader
 
 _LEADING_DIGITS_RE = re.compile(r"^(\d{1,3})(.*)$")
 _OPTIONAL_LEADING_DIGITS_RE = re.compile(r"^(\d{1,3})?(.*)$")
-_SEAT_MODIFIER_KEYWORDS = {"EXST", "CBBG"} # expand as needed
+_SEAT_MODIFIER_KEYWORDS = {"EXST", "CBBG"}
 
 
 def _known_titles_longest_first() -> list[str]:
@@ -147,6 +147,23 @@ def parse_name_element(line: str) -> NameElement:
         people = _try_parse_distinct_surnames(full_sequence, effective_party_count)
         uses_distinct_surnames = people is not None
 
+    if people is None and len(trailing) == 1 and trailing[0] not in known_titles:
+        # REQ03 section 16: a group/tour name substitutes for all
+        # individual names, e.g. "30SITA/TOUR". Only reached once both
+        # individual-name grammars have already failed to match, and
+        # only for a single trailing token that isn't a known title --
+        # so this doesn't compete with or shadow either of them.
+        return NameElement(
+            raw=stripped,
+            number_in_party=number_in_party,
+            surname=surname,
+            people=[],
+            is_group_placeholder=True,
+            group_name_suffix=trailing[0],
+            seat_modifiers=seat_modifiers,
+            uses_distinct_surnames=False,
+        )
+
     if people is None:
         raise ElementParseError(
             f"NAME group has {len(trailing)} given-name/title tokens after "
@@ -239,6 +256,8 @@ def parse_name_reference(token: str) -> NameReference:
 
 def render_name_element(name: NameElement) -> str:
     if name.is_group_placeholder:
+        if name.group_name_suffix:
+            return f"{name.number_in_party}{name.surname}/{name.group_name_suffix}"
         return f"{name.number_in_party}{name.surname}"
 
     if name.uses_distinct_surnames:

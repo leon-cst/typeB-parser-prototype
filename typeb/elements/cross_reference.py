@@ -48,10 +48,17 @@ def cross_reference_passengers(
             key = _passenger_key(person_surname, person.given_name, person.title)
             if key in pool:
                 raise CrossReferenceError(
-                    f"Two different people resolve to the same "
+                    f"Two different NAME elements resolve to the same "
                     f"(surname, given_name, title) key {key} -- can't "
                     f"disambiguate which one any later OSI/SSR reference "
-                    f"to this name means. NAME line: {ne.raw!r}"
+                    f"to this name means. NAME line: {ne.raw!r}. If this "
+                    f"name is legitimately declared only once in the "
+                    f"real message, check whether an adjacent SSR/OSI "
+                    f"line was split across two physical lines (REQ03's "
+                    f"line-continuation convention, e.g. a trailing '-' "
+                    f"or repeated code+airline prefix) -- line "
+                    f"continuation isn't parsed yet, so a continued line "
+                    f"can be misread as a second, duplicate NAME element."
                 )
             pool[key] = {
                 "surname": person_surname,
@@ -69,6 +76,14 @@ def cross_reference_passengers(
     for element in contact_elements:
         name_ref = getattr(element, "name", None)
         if name_ref is None:
+            continue
+        if isinstance(name_ref, NameElement):
+            # A multi-person shared-surname reference (REQ03 section 16
+            # group SSRs, e.g. "-5ARDMORE/BOB/SUE/TIM/TOM/TONY") refers
+            # to several passengers at once, not one -- there's no
+            # single BookingPassenger record to attach this to, so it's
+            # left out of cross-referencing rather than guessing which
+            # one person it means.
             continue
 
         key = _passenger_key(name_ref.surname, name_ref.given_name, name_ref.title)
@@ -155,9 +170,11 @@ def _set_passenger_type(record: dict, new_type: str, element: ContactElement) ->
 def validate_party_size(
     name_elements: list[NameElement], segment_number_in_party: int
 ) -> list[str]:
-    total_name_party = sum(
-        ne.number_in_party for ne in name_elements if not ne.is_group_placeholder
-    )
+    # Every NAME element's number_in_party counts toward the total,
+    # whether or not individual names are known -- a group placeholder
+    # like "6SEAMEN" or a surname-only entry like "5ARDMORE" still
+    # represents that many real seats.
+    total_name_party = sum(ne.number_in_party for ne in name_elements)
     if total_name_party != segment_number_in_party:
         return [
             f"NAME elements declare a total party size of "

@@ -3,7 +3,25 @@ from __future__ import annotations
 from typeb.elements.contact import is_dob_shape, is_email_shape, parse_dob, parse_email_contact
 from typeb.elements.errors import ElementParseError, UnrecognizedElementError
 from typeb.elements.name import parse_name_reference
-from typeb.model.elements import OsiPassengerTypeFlagElement, OsiRecordLocatorElement
+from typeb.model.elements import (
+    OsiContactAddressElement,
+    OsiPassengerTypeFlagElement,
+    OsiRecordLocatorElement,
+)
+
+
+def _parse_osi_contact_address(line: str, tokens: list[str]) -> OsiContactAddressElement:
+    if len(tokens) < 4:
+        raise ElementParseError(
+            f"OSI contact-address line too short, expected 'OSI <airline> "
+            f"<CTC?> <detail>...': {line!r}"
+        )
+    return OsiContactAddressElement(
+        raw=line.strip(),
+        airline_code=tokens[1],
+        action_code=tokens[2],
+        detail=" ".join(tokens[3:]),
+    )
 
 
 def _parse_osi_passenger_type_flag(line: str, tokens: list[str]):
@@ -54,9 +72,11 @@ def parse_osi_line(line: str):
         return _parse_osi_record_locator(stripped, tokens)
     if "CHD" in tokens or "INF" in tokens:
         return _parse_osi_passenger_type_flag(stripped, tokens)
+    if len(tokens) >= 3 and tokens[2].startswith("CTC"):
+        return _parse_osi_contact_address(stripped, tokens)
 
     raise UnrecognizedElementError(
         f"No parser implemented yet for this OSI shape (recognized: "
         f"email 'E/...', DOB 'DOB/...', 'RLOC', passenger-type flag "
-        f"'CHD'/'INF'): {line!r}"
+        f"'CHD'/'INF', contact address 'CTC*'): {line!r}"
     )

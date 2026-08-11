@@ -14,12 +14,16 @@ def _build_booking_message(raw: str) -> BookingMessage:
         envelope=envelope,
         passengers=[],
         name_elements=name_elements,
+        group_placeholders=[],
+        arrival_elements=[],
         segments=segments,
         airline_record_locators=[],
+        group_fare_info=[],
+        group_seat_requests=[],
+        contact_addresses=[],
         warnings=[],
         unrecognized_lines=[],
     )
-
 
 def test_req03_p49_booking_confirm_reply_matches_spec_exactly():
     request_raw = """\

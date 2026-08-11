@@ -1,40 +1,27 @@
-"""
-Domain models for the envelope layer: Address, CommReference,
-RecordLocator, Envelope.
-
-"""
 from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
-# REQ03 p.9-10, "POS CONSTRUCTIONS": the 10 point-of-sale sub-fields, in
-# the order the spec lists them. Order is currently fixed (which could mean incorrect)
-# Confirm, then revisit and fix.
 _POS_FIELD_NAMES = (
-    "travel_agent_city_code",  # 1: in-house travel agent / TA city code
-    "iata_number",             # 2: travel agent user ID (IATA) number
-    "city_airport_code",       # 3: city/airport code, e.g. "JKT"
-    "crs_code",                # 4: CRS code, e.g. "LH"
-    "user_type",               # 5: A=Airlines, E=ERSP, N=no user ID, T=other
-    "iso_country_code",        # 6: ISO country code, e.g. "ID"
-    "iso_currency_code",       # 7: ISO currency code for ticket payment
-    "duty_code",                # 8: duty code of agent, e.g. "SU"
-    "user_id_pss",              # 9: user ID within the PSS
-    "point_of_departure",       # 10: point of departure, e.g. "CGK"
+    "travel_agent_city_code",
+    "iata_number",
+    "city_airport_code",
+    "crs_code",
+    "user_type",
+    "iso_country_code",
+    "iso_currency_code",
+    "duty_code",
+    "user_id_pss",
+    "point_of_departure",
 )
 
 _USER_TYPE_INDEX = _POS_FIELD_NAMES.index("user_type")
 
-# EXPAND as needed
+# REQ03 p.9-10 enumerates user type as exactly these single letters.
 _VALID_USER_TYPES = {"A", "E", "N", "T"}
 
 
 class Address(BaseModel):
-    """A single Type B address: 3-char city/airport code + 2-char office
-    function code + 2-3 char airline/CRS designator.
-    REQ03 section 2 (p.4) and section 4 "Communication Reference Element".
-
-    """
     model_config = ConfigDict(frozen=True, str_strip_whitespace=True, str_to_upper=True)
 
     raw: str
@@ -49,19 +36,11 @@ class Address(BaseModel):
             raise ValueError(f"Address token too short: {token!r}")
         city_code, office_code, designator = cleaned[:3], cleaned[3:5], cleaned[5:]
         if not designator:
-            raise ValueError(
-                f"Address token missing airline/CRS designator: {token!r}"
-            )
-        return cls(
-            raw=cleaned,
-            city_code=city_code,
-            office_code=office_code,
-            designator=designator,
-        )
+            raise ValueError(f"Address token missing airline/CRS designator: {token!r}")
+        return cls(raw=cleaned, city_code=city_code, office_code=office_code, designator=designator)
 
 
 class CommReference(BaseModel):
-    """Communication reference element: '.' + origin address + date/time group."""
     model_config = ConfigDict(frozen=True, str_strip_whitespace=True, str_to_upper=True)
 
     origin: Address
@@ -69,11 +48,25 @@ class CommReference(BaseModel):
 
 
 class RecordLocator(BaseModel):
-    """One record locator line"""
+    """REQ03 p.9-10: '<booking_office> <location_of_record>[/pos_field]*'.
+
+    booking_office itself is "<3-char city/airport code><airline
+    designator>" (REQ03 section 6: "3 digit city or airport code +
+    Airline designator atau CRS originating message") -- same shape as
+    Address, so it's decomposed the same way. A 3-character designator
+    is written with a '/' separator instead ("DPS/ABC" per REQ03's own
+    example); booking_office_designator strips that slash if present.
+
+    POS fields fill positionally, except that a 5th value which isn't a
+    valid user type (A/E/N/T) is treated as user_type being omitted
+    without a placeholder slash, and shifts the remaining values down.
+    """
     model_config = ConfigDict(frozen=True, str_strip_whitespace=True, str_to_upper=True)
 
     raw: str
     booking_office: str
+    booking_office_city: str
+    booking_office_designator: str
     location_of_record: str
     travel_agent_city_code: str | None = None
     iata_number: str | None = None
@@ -99,46 +92,54 @@ class RecordLocator(BaseModel):
         if not booking_office:
             raise ValueError(f"Record locator line missing booking office: {line!r}")
 
-        rest = rest.strip()
-        if not rest:
+        if "/" in booking_office:
+            # REQ03 section 6: a 3-character airline designator is
+            # written with a '/' separator, e.g. "DPS/ABC".
+            booking_office_city, _, booking_office_designator = booking_office.partition("/")
+        else:
+            booking_office_city, booking_office_designator = (
+                booking_office[:3],
+                booking_office[3:],
+            )
+        if len(booking_office_city) != 3 or not booking_office_designator:
             raise ValueError(
-                f"Record locator line missing location of record: {line!r}"
+                f"Booking office doesn't match '<3-char city code>"
+                f"<designator>' (REQ03 section 6): {booking_office!r} "
+                f"in {line!r}"
             )
 
-        # rest = "<location_of_record>[/pos_field]*"
+        rest = rest.strip()
+        if not rest:
+            raise ValueError(f"Record locator line missing location of record: {line!r}")
+
         loc_and_pos = rest.split("/")
         location_of_record = loc_and_pos[0].strip()
         if not location_of_record:
-            raise ValueError(
-                f"Record locator line missing location of record: {line!r}"
-            )
+            raise ValueError(f"Record locator line missing location of record: {line!r}")
 
         pos_values = [v.strip() or None for v in loc_and_pos[1:]]
- 
-        # user_type omitted without a placeholder slash
+
+        # user_type omitted without a placeholder slash -- see class docstring.
         if (
             len(pos_values) > _USER_TYPE_INDEX
             and pos_values[_USER_TYPE_INDEX] is not None
             and pos_values[_USER_TYPE_INDEX] not in _VALID_USER_TYPES
         ):
             pos_values.insert(_USER_TYPE_INDEX, None)
- 
-        pos_fields = dict(zip(_POS_FIELD_NAMES, pos_values))
 
+        pos_fields = dict(zip(_POS_FIELD_NAMES, pos_values))
 
         return cls(
             raw=raw,
             booking_office=booking_office,
+            booking_office_city=booking_office_city,
+            booking_office_designator=booking_office_designator,
             location_of_record=location_of_record,
             **pos_fields,
         )
 
 
 class Envelope(BaseModel):
-    """The parsed envelope: address block, communication reference,
-    optional message identifier, optional record locator line(s).
-
-    """
     model_config = ConfigDict(frozen=True, str_strip_whitespace=True, str_to_upper=True)
 
     priority_code: str
@@ -149,13 +150,11 @@ class Envelope(BaseModel):
 
     @field_validator("addresses")
     @classmethod
-    def _at_least_one_address(cls, v: list[Address]) -> list[Address]:
+    def _at_least_one_address(cls, v):
         if not v:
             raise ValueError("Envelope must have at least one address")
         return v
 
     @property
     def effective_identifier(self) -> str:
-        """message_identifier, or the synthetic 'BOOKING' pseudo-identifier
-        when none is present (REQ03 section 5's implicit-booking rule)."""
         return self.message_identifier or "BOOKING"

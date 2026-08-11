@@ -87,7 +87,7 @@ QU CGKRM8G
 NYC1G CPNR1G/AAA/111122223333/NYC/1G/NL/CHF/SU
 1RAHARJO/BAMBANGMR
 8G083F24SEP CGKDPS NN1 0910 1015
-SSR NSST 8G NN1 CGKDPS0871Y17AUG"""
+SSR ZZZZ 8G NN1 CGKDPS0871Y17AUG"""
 
     msg = parse_booking_message(raw)
 
@@ -98,8 +98,8 @@ SSR NSST 8G NN1 CGKDPS0871Y17AUG"""
     assert len(msg.unrecognized_lines) == 1
     unrec = msg.unrecognized_lines[0]
     assert unrec.tokenizer_kind == "SSR"
-    assert "NSST" in unrec.reason
-    assert unrec.raw == "SSR NSST 8G NN1 CGKDPS0871Y17AUG"
+    assert "ZZZZ" in unrec.reason
+    assert unrec.raw == "SSR ZZZZ 8G NN1 CGKDPS0871Y17AUG"
 
 
 def test_unknown_line_collected_not_fatal():

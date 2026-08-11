@@ -1,11 +1,5 @@
 """
 SEGMENT element parser (booking context).
-
-REQ03 p.9-10: '<airline><flight><rbd><date> <board><off> <action><count>
-[<dep> <arr>]', with the first field glued (airline + flight number + RBD
-+ date all concatenated), e.g. "8G083F24SEP CGKDPS NN1 0910 1015".
-
-Departure/arrival times are optional
 """
 from __future__ import annotations
 
@@ -15,10 +9,17 @@ from typeb.elements.errors import ElementParseError
 from typeb.model.elements import SegmentElement
 
 _FIRST_TOKEN_RE = re.compile(
-    r"^(?P<airline>[A-Z0-9]{2})(?P<flight>\d{2,4})(?P<rbd>[A-Z])(?P<date>\d{2}[A-Z]{3})$"
+    r"^(?P<airline>[A-Z0-9]{2})(?P<flight>\d{2,4})(?P<rbd>[A-Z])"
+    r"(?P<date>\d{2}[A-Z]{3}(?:\d{2})?)$"
 )
 _ACTION_TOKEN_RE = re.compile(r"^(?P<action>[A-Z]{2})(?P<count>\d{1,3})$")
 _TIME_RE = re.compile(r"^\d{4}$")
+
+
+_ARRIVAL_TIME_WITH_DAY_CHANGE_RE = re.compile(
+    r"^(?P<time>\d{4})/(?P<sign>M?)(?P<offset>\d{1,2})$"
+)
+
 
 _GLUED_ACTION_COUNT_TIME_RE = re.compile(
     r"^(?P<action_count>[A-Z]{2}\d{1,3})/(?P<dep_time>\d{4})$"
@@ -77,13 +78,31 @@ def parse_segment_element(line: str) -> SegmentElement:
 
     departure_time_raw: str | None = None
     arrival_time_raw: str | None = None
+    arrival_day_offset: int | None = None
     if len(tokens) == 5:
-        if not (_TIME_RE.match(tokens[3]) and _TIME_RE.match(tokens[4])):
+        if not _TIME_RE.match(tokens[3]):
             raise ElementParseError(
-                f"SEGMENT line's time tokens should be 4 digits each "
-                f"(HHMM): {tokens[3]!r}, {tokens[4]!r} in {line!r}"
+                f"SEGMENT line's departure time should be 4 digits "
+                f"(HHMM): {tokens[3]!r} in {line!r}"
             )
-        departure_time_raw, arrival_time_raw = tokens[3], tokens[4]
+        departure_time_raw = tokens[3]
+
+        arr_token = tokens[4]
+        if _TIME_RE.match(arr_token):
+            arrival_time_raw = arr_token
+        else:
+            day_change_match = _ARRIVAL_TIME_WITH_DAY_CHANGE_RE.match(arr_token)
+            if not day_change_match:
+                raise ElementParseError(
+                    f"SEGMENT line's arrival time should be 4 digits "
+                    f"(HHMM), optionally with a day-of-change indicator "
+                    f"('/1' or '/M1'): {arr_token!r} in {line!r}"
+                )
+            arrival_time_raw = day_change_match.group("time")
+            offset = int(day_change_match.group("offset"))
+            arrival_day_offset = (
+                -offset if day_change_match.group("sign") == "M" else offset
+            )
 
     return SegmentElement(
         raw=stripped,
@@ -97,7 +116,9 @@ def parse_segment_element(line: str) -> SegmentElement:
         number_in_party=int(action_match.group("count")),
         departure_time_raw=departure_time_raw,
         arrival_time_raw=arrival_time_raw,
+        arrival_day_offset=arrival_day_offset,
     )
+
 
 def render_segment_element(segment: SegmentElement) -> str:
     first = (
@@ -108,5 +129,9 @@ def render_segment_element(segment: SegmentElement) -> str:
     action = f"{segment.action_code}{segment.number_in_party}"
     tokens = [first, city_pair, action]
     if segment.departure_time_raw and segment.arrival_time_raw:
-        tokens += [segment.departure_time_raw, segment.arrival_time_raw]
+        arrival = segment.arrival_time_raw
+        if segment.arrival_day_offset is not None:
+            offset = segment.arrival_day_offset
+            arrival += f"/M{-offset}" if offset < 0 else f"/{offset}"
+        tokens += [segment.departure_time_raw, arrival]
     return " ".join(tokens)

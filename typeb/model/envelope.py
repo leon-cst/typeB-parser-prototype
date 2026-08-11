@@ -48,19 +48,7 @@ class CommReference(BaseModel):
 
 
 class RecordLocator(BaseModel):
-    """REQ03 p.9-10: '<booking_office> <location_of_record>[/pos_field]*'.
 
-    booking_office itself is "<3-char city/airport code><airline
-    designator>" (REQ03 section 6: "3 digit city or airport code +
-    Airline designator atau CRS originating message") -- same shape as
-    Address, so it's decomposed the same way. A 3-character designator
-    is written with a '/' separator instead ("DPS/ABC" per REQ03's own
-    example); booking_office_designator strips that slash if present.
-
-    POS fields fill positionally, except that a 5th value which isn't a
-    valid user type (A/E/N/T) is treated as user_type being omitted
-    without a placeholder slash, and shifts the remaining values down.
-    """
     model_config = ConfigDict(frozen=True, str_strip_whitespace=True, str_to_upper=True)
 
     raw: str

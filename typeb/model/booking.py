@@ -14,9 +14,7 @@ from typeb.model.passenger import BookingPassenger
 
 
 class GroupPlaceholder(BaseModel):
-    """A NAME element with no individual names given (REQ03 section 7),
-    e.g. "6SEAMEN" or "30SITA/TOUR". confirmed_party_size comes from a
-    matching SSR GRPS line's TCP value when present."""
+
     model_config = ConfigDict(frozen=True)
 
     surname: str

@@ -62,6 +62,31 @@ def test_osi_child_flag_from_real_message():
     assert osi.name.title == "MSTR"
 
 
+def test_osi_party_count_full_names():
+    # REQ03 section 25 Option-1 non-group "who else is booked" list
+    osi = parse_osi_line("OSI SJ TCP3 1CCCCC/KMR 1DDDDD/ZMR")
+    assert osi.airline_code == "SJ"
+    assert osi.total_party_count == 3
+    assert [n.surname for n in osi.names] == ["CCCCC", "DDDDD"]
+
+
+def test_osi_party_count_bare_surname_reference():
+    # names may be a partial list, and a name may have no given
+    # name/title at all (bare surname, no slash)
+    osi = parse_osi_line("OSI YY TCP3 1ALLEN")
+    assert osi.total_party_count == 3
+    assert len(osi.names) == 1
+    assert osi.names[0].surname == "ALLEN"
+    assert osi.names[0].given_name is None
+    assert osi.names[0].title is None
+
+
+def test_osi_party_count_no_names():
+    osi = parse_osi_line("OSI MZ TCP20")
+    assert osi.total_party_count == 20
+    assert osi.names == []
+
+
 def test_osi_unrecognized_shape_raises_clearly():
     with pytest.raises(ElementParseError, match="No parser implemented yet for this OSI shape"):
         parse_osi_line("OSI BA TKNO 1261234567890")

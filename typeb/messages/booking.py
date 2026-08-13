@@ -2,17 +2,18 @@ from __future__ import annotations
 
 from typeb.elements.cross_reference import cross_reference_passengers, validate_party_size
 from typeb.elements.errors import ElementParseError, UnrecognizedElementError
-from typeb.elements.name import parse_name_line
+from typeb.elements.name import split_name_change_boundary
 from typeb.elements.osi import parse_osi_line
 from typeb.elements.segment import parse_segment_element
 from typeb.elements.ssr import parse_ssr_line
 from typeb.elements.tokenizer import ElementKind, tokenize_body
-from typeb.envelope.parser import parse_envelope
+from typeb.envelope.parser import _DEFAULT_MAX_LINE_LENGTH, parse_envelope
 from typeb.model.booking import BookingMessage, GroupPlaceholder
 from typeb.model.common import UnrecognizedLine
 from typeb.model.elements import (
-    NameElement,
+    AutomatedSsrElement,
     OsiContactAddressElement,
+    OsiPartyCountElement,
     OsiRecordLocatorElement,
     SegmentElement,
     SsrGroupElement,
@@ -23,7 +24,7 @@ from typeb.model.elements import (
 
 
 def parse_booking_message(raw: str) -> BookingMessage:
-    envelope, body_lines = parse_envelope(raw)
+    envelope, body_lines, warnings = parse_envelope(raw)
 
     if envelope.effective_identifier != "BOOKING":
         raise ElementParseError(
@@ -31,15 +32,30 @@ def parse_booking_message(raw: str) -> BookingMessage:
             f"(identifier={envelope.effective_identifier!r})."
         )
 
-    name_elements: list[NameElement] = []
+    name_lines: list[str] = []  # NAME lines, with "CHNT" as a sentinel
     segments: list[SegmentElement] = []
     contact_elements: list = []
     unrecognized: list[UnrecognizedLine] = []
 
     for kind, line in tokenize_body(body_lines):
+        if len(line) > _DEFAULT_MAX_LINE_LENGTH:
+            warnings.append(
+                f"Line excluded from parsing, {len(line)} characters "
+                f"exceeding the {_DEFAULT_MAX_LINE_LENGTH}-character "
+                f"limit (REQ03 section 3): {line!r}"
+            )
+            unrecognized.append(
+                UnrecognizedLine(
+                    raw=line,
+                    tokenizer_kind=kind.value,
+                    reason=f"Line exceeds {_DEFAULT_MAX_LINE_LENGTH}-character limit",
+                )
+            )
+            continue
+
         try:
-            if kind == ElementKind.NAME:
-                name_elements.extend(parse_name_line(line))
+            if kind in (ElementKind.NAME, ElementKind.CHNT):
+                name_lines.append(line)
             elif kind == ElementKind.SEGMENT:
                 segments.append(parse_segment_element(line))
             elif kind == ElementKind.SSR:
@@ -66,11 +82,17 @@ def parse_booking_message(raw: str) -> BookingMessage:
                 UnrecognizedLine(raw=line, tokenizer_kind=kind.value, reason=str(e))
             )
 
+    name_elements, replacement_name_elements = split_name_change_boundary(name_lines)
+
     # No reliable wire-level signal distinguishes ARRIVAL from SEGMENT
     # lines, so this stays empty until a real signal is found.
     arrival_elements: list[SegmentElement] = []
 
-    passengers = cross_reference_passengers(name_elements, contact_elements)
+    current_name_elements = (
+        replacement_name_elements if replacement_name_elements else name_elements
+    )
+
+    passengers = cross_reference_passengers(current_name_elements, contact_elements)
 
     grps_by_group_name: dict[str, int] = {}
     for e in contact_elements:
@@ -81,7 +103,7 @@ def parse_booking_message(raw: str) -> BookingMessage:
             grps_by_group_name[e.group_name] = int(digits)
 
     group_placeholders = []
-    for ne in name_elements:
+    for ne in current_name_elements:
         if not ne.is_group_placeholder:
             continue
         group_name = ne.surname + (
@@ -104,10 +126,11 @@ def parse_booking_message(raw: str) -> BookingMessage:
     group_fare_info = [e for e in contact_elements if isinstance(e, SsrGroupFareElement)]
     group_seat_requests = [e for e in contact_elements if isinstance(e, SsrGroupSeatElement)]
     contact_addresses = [e for e in contact_elements if isinstance(e, OsiContactAddressElement)]
+    party_count_notices = [e for e in contact_elements if isinstance(e, OsiPartyCountElement)]
+    automated_ssrs = [e for e in contact_elements if isinstance(e, AutomatedSsrElement)]
 
-    warnings: list[str] = []
     for segment in segments:
-        for warning in validate_party_size(name_elements, segment.number_in_party):
+        for warning in validate_party_size(current_name_elements, segment.number_in_party):
             if warning not in warnings:
                 warnings.append(warning)
 
@@ -115,6 +138,7 @@ def parse_booking_message(raw: str) -> BookingMessage:
         envelope=envelope,
         passengers=passengers,
         name_elements=name_elements,
+        replacement_name_elements=replacement_name_elements,
         group_placeholders=group_placeholders,
         arrival_elements=arrival_elements,
         segments=segments,
@@ -122,6 +146,8 @@ def parse_booking_message(raw: str) -> BookingMessage:
         group_fare_info=group_fare_info,
         group_seat_requests=group_seat_requests,
         contact_addresses=contact_addresses,
+        party_count_notices=party_count_notices,
+        automated_ssrs=automated_ssrs,
         warnings=warnings,
         unrecognized_lines=unrecognized,
     )

@@ -9,6 +9,7 @@ from typeb.tables import loader
 _LEADING_DIGITS_RE = re.compile(r"^(\d{1,3})(.*)$")
 _OPTIONAL_LEADING_DIGITS_RE = re.compile(r"^(\d{1,3})?(.*)$")
 _SEAT_MODIFIER_KEYWORDS = {"EXST", "CBBG"}
+_CHNT_MARKER = "CHNT"  # sentinel used by split_name_change_boundary()
 
 
 def _known_titles_longest_first() -> list[str]:
@@ -198,12 +199,44 @@ def parse_name_line(line: str) -> list[NameElement]:
         if not _LEADING_DIGITS_RE.match(group) or group.rstrip("0123456789") == "":
             raise ElementParseError(
                 f"NAME line token {i + 1} of {len(groups)} ({group!r}) does "
-                f"not begin a name group -- every space-separated group on "
+                f"not begin a name group, every space-separated group on "
                 f"a NAME line must start with its own 1-3 digit number in "
                 f"party, immediately followed by the name: {line!r}"
             )
 
     return [parse_name_element(g) for g in groups]
+
+
+def split_name_change_boundary(
+    name_lines: list[str],
+) -> tuple[list[NameElement], list[NameElement]]:
+
+    if _CHNT_MARKER not in name_lines:
+        return [g for line in name_lines for g in parse_name_line(line)], []
+
+    if name_lines.count(_CHNT_MARKER) > 1:
+        raise ElementParseError(
+            "Message has more than one CHNT line -- only one name-change "
+            "boundary is supported."
+        )
+
+    boundary = name_lines.index(_CHNT_MARKER)
+    before, after = name_lines[:boundary], name_lines[boundary + 1:]
+
+    if not before:
+        raise ElementParseError(
+            "CHNT appeared with no NAME line before it -- REQ03 section "
+            "25/30 requires the names being changed to precede CHNT."
+        )
+    if not after:
+        raise ElementParseError(
+            "CHNT appeared with no NAME line after it -- REQ03 section "
+            "25/30 requires the replacement names to follow CHNT."
+        )
+
+    current_names = [g for line in before for g in parse_name_line(line)]
+    replacement_names = [g for line in after for g in parse_name_line(line)]
+    return current_names, replacement_names
 
 
 def parse_name_reference(token: str) -> NameReference:
@@ -213,9 +246,19 @@ def parse_name_reference(token: str) -> NameReference:
     leading_number = int(m.group(1)) if m.group(1) else None
     rest = m.group(2)
 
-    if not rest or "/" not in rest:
-        raise ElementParseError(
-            f"Name reference malformed, expected '[N]SURNAME/GIVEN[/TITLE]': {token!r}"
+    if not rest:
+        raise ElementParseError(f"Name reference missing a name: {token!r}")
+
+    if "/" not in rest:
+        # Bare surname, no given name/title (REQ03 section 25: "OSI YY
+        # TCP3 1ALLEN") same no-slash grammar NameElement already
+        # accepts for a group placeholder, here for a single reference.
+        return NameReference(
+            raw=stripped,
+            leading_number=leading_number,
+            surname=rest,
+            given_name=None,
+            title=None,
         )
 
     parts = rest.split("/")

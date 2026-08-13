@@ -25,7 +25,7 @@ AA800 J 01JUN CGKDPS
 AA800 Y 01JUN CGKDPS
 AA800 B 01JUN CGKDPS
 NNNN"""
-    envelope, body = parse_envelope(raw)
+    envelope, body, _ = parse_envelope(raw)
 
     assert envelope.priority_code == "QU"
     assert len(envelope.addresses) == 1
@@ -53,7 +53,7 @@ QU HDQRI8G
 RVR
 8G407/16JUN26-30DEC26/1234567
 NNNN"""
-    envelope, body = parse_envelope(raw)
+    envelope, body, _ = parse_envelope(raw)
 
     assert envelope.message_identifier == "RVR"
     assert envelope.record_locators == []
@@ -69,7 +69,7 @@ QU CGKRM8G
 NYC1G CPNR1G/AAA/111122223333/NYC/1G/NL/CHF/SU
 1RAHARJO/BAMBANGMR
 8G083F24SEP CGKDPS NN1 0910 1015"""
-    envelope, body = parse_envelope(raw)
+    envelope, body, _ = parse_envelope(raw)
 
     assert envelope.message_identifier is None
     assert envelope.effective_identifier == "BOOKING"
@@ -108,7 +108,7 @@ QU HDQRMAA HDQRMUA
 CPHSK 1713
 2BORGE/A/D
 SK919F04JUN CPHJFK HK2/1000 1300"""
-    envelope, body = parse_envelope(raw)
+    envelope, body, _ = parse_envelope(raw)
 
     assert len(envelope.addresses) == 2
     assert envelope.addresses[0].designator == "AA"
@@ -134,7 +134,7 @@ SJ920Y15FEB SINAMS XX1
 8G320Y15FEB CGKSIN HK1/1030 1210
 SJ890Y15FEB SINLON SS1/1350 1610
 OSI YY RLOC HDQ8GCPNRSJ"""
-    envelope, body = parse_envelope(raw)
+    envelope, body, _ = parse_envelope(raw)
 
     assert envelope.message_identifier == "DVD"
     assert len(envelope.record_locators) == 1
@@ -169,7 +169,7 @@ HDR1B CPNR1B/MADIB0500/1234567/////
 HDQSJ CPNRSJ
 1AAAAA/RMR 1BBBBB/KMR 1FFFFF/LMR
 SJ340Y30JUL CGKSIN HK3/1145 1515"""
-    envelope, body = parse_envelope(raw)
+    envelope, body, _ = parse_envelope(raw)
 
     assert envelope.message_identifier == "BPR"
     assert len(envelope.record_locators) == 2

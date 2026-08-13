@@ -22,7 +22,8 @@ _WRONG_FAMILY_KINDS = {
 
 
 def parse_availability_message(raw: str) -> AvailabilityMessage:
-    envelope, body_lines = parse_envelope(raw)
+    # AvailabilityMessage has no warnings field yet
+    envelope, body_lines, _envelope_warnings = parse_envelope(raw)
 
     if envelope.effective_identifier != "AVN":
         raise ElementParseError(

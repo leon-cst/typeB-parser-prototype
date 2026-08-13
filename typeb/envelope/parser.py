@@ -19,10 +19,6 @@ _NAME_LINE_RE = re.compile(r"^\d{1,3}\S")
 
 _TERMINATORS = {"NNNN", "//"}
 
-# REQ03 section 3 / section 5: max line length including spaces. REQ02
-# section 9 states 68 for MAS specifically -- a documented inconsistency,
-# not reconciled here. See PartnerProfile (a later step) for making this
-# configurable instead of a single constant.
 _DEFAULT_MAX_LINE_LENGTH = 69
 
 
@@ -34,14 +30,12 @@ class LineTooLongError(EnvelopeParseError):
     """69 characters including spaces, hard limit, checked per line"""
 
 
-def _check_line_lengths(lines: list[str]) -> None:
-    for line_number, line in enumerate(lines, start=1):
-        if len(line) > _DEFAULT_MAX_LINE_LENGTH:
-            raise LineTooLongError(
-                f"Line {line_number} is {len(line)} characters, exceeding "
-                f"the {_DEFAULT_MAX_LINE_LENGTH}-character limit (REQ03 "
-                f"section 3): {line!r}"
-            )
+def _line_length_warning(line_number: int, line: str) -> str:
+    return (
+        f"Line {line_number} is {len(line)} characters, exceeding the "
+        f"{_DEFAULT_MAX_LINE_LENGTH}-character limit (REQ03 section 3): "
+        f"{line!r}"
+    )
 
 
 def _looks_like_name_line(line: str) -> bool:
@@ -52,13 +46,9 @@ def _looks_like_terminator(line: str) -> bool:
     return line.strip() in _TERMINATORS
 
 
-def parse_envelope(raw_message: str) -> tuple[Envelope, list[str]]:
-    """Parse the envelope portion of a raw Type B message.
+def parse_envelope(raw_message: str) -> tuple[Envelope, list[str], list[str]]:
 
-    Returns (envelope, remaining_body_lines) 
-    """
     lines = normalize_message(raw_message).lines
-    _check_line_lengths(lines)
 
     if len(lines) < 2:
         raise EnvelopeParseError(
@@ -68,13 +58,21 @@ def parse_envelope(raw_message: str) -> tuple[Envelope, list[str]]:
         )
 
     idx = 0
+    warnings: list[str] = []
+
+    def _consume(line_index: int) -> str:
+        line = lines[line_index]
+        if len(line) > _DEFAULT_MAX_LINE_LENGTH:
+            warnings.append(_line_length_warning(line_index + 1, line))
+        return line
 
     # --- Address block: priority code + one or more addresses ----------
-    address_tokens = lines[idx].strip().split()
+    address_line = _consume(idx)
+    address_tokens = address_line.strip().split()
     if len(address_tokens) < 2:
         raise EnvelopeParseError(
             f"Address line malformed, expected "
-            f"'PRIORITY ADDR [ADDR ...]': {lines[idx]!r}"
+            f"'PRIORITY ADDR [ADDR ...]': {address_line!r}"
         )
     priority_code, *address_strs = address_tokens
     try:
@@ -90,12 +88,13 @@ def parse_envelope(raw_message: str) -> tuple[Envelope, list[str]]:
             f"Expected communication reference line starting with '.', "
             f"got: {got!r}"
         )
-    comm_line = lines[idx].strip()[1:].strip()
+    comm_line_raw = _consume(idx)
+    comm_line = comm_line_raw.strip()[1:].strip()
     comm_tokens = comm_line.split()
     if not comm_tokens:
         raise EnvelopeParseError(
             f"Communication reference line has no origin address: "
-            f"{lines[idx]!r}"
+            f"{comm_line_raw!r}"
         )
     try:
         origin = Address.parse(comm_tokens[0])
@@ -110,7 +109,7 @@ def parse_envelope(raw_message: str) -> tuple[Envelope, list[str]]:
     # --- Optional message identifier ------------------------------------
     message_identifier: str | None = None
     if idx < len(lines) and loader.is_known_message_identifier(lines[idx].strip()):
-        message_identifier = lines[idx].strip()
+        message_identifier = _consume(idx).strip()
         idx += 1
 
     # --- Optional record locator (0, 1, or 2 lines) ---------------------
@@ -136,7 +135,7 @@ def parse_envelope(raw_message: str) -> tuple[Envelope, list[str]]:
             and not _looks_like_name_line(lines[idx])
             and not _looks_like_terminator(lines[idx])
         ):
-            record_locator_raw_lines.append(lines[idx].strip())
+            record_locator_raw_lines.append(_consume(idx).strip())
             idx += 1
         if not record_locator_raw_lines:
             got = lines[idx] if idx < len(lines) else "<end of message>"
@@ -164,4 +163,4 @@ def parse_envelope(raw_message: str) -> tuple[Envelope, list[str]]:
         message_identifier=message_identifier,
         record_locators=record_locators,
     )
-    return envelope, lines[idx:]
+    return envelope, lines[idx:], warnings

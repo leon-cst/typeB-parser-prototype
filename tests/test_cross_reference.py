@@ -149,6 +149,34 @@ def test_group_placeholder_contributes_no_passengers():
     assert passengers[0].surname == "RED"
 
 
+def test_automated_ssr_referencing_a_name_does_not_crash():
+    # Regression: VGML (an AutomatedSsrElement) with a name reference
+    # used to raise CrossReferenceError -- it has no case in
+    # _apply_element and shouldn't, since the referenced passenger may
+    # be one being cancelled/replaced in the same message (name-change
+    # messages routinely do this).
+    names = [parse_name_element("1DDDDD/MRS")]
+    contacts = [
+        parse_ssr_line("SSR VGML MZ XX1 ORDBRU0352Y20MAY-1DDDDD/MRS"),
+    ]
+    passengers = cross_reference_passengers(names, contacts)
+    assert len(passengers) == 1
+    assert passengers[0].surname == "DDDDD"
+
+
+def test_automated_ssr_referencing_an_absent_name_does_not_crash():
+    # The referenced passenger doesn't even need to exist in this call's
+    # name_elements -- e.g. a name-change message where the SSR still
+    # names the passenger being replaced.
+    names = [parse_name_element("1YYYYY/MRS")]
+    contacts = [
+        parse_ssr_line("SSR VGML MZ XX1 ORDBRU0352Y20MAY-1DDDDD/MRS"),
+    ]
+    passengers = cross_reference_passengers(names, contacts)
+    assert len(passengers) == 1
+    assert passengers[0].surname == "YYYYY"
+
+
 # --------------------------------------------------------------------------
 # validate_party_size
 # --------------------------------------------------------------------------

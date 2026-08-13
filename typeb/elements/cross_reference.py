@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Union
 
 from typeb.model.elements import (
+    AutomatedSsrElement,
     DobElement,
     EmailContactElement,
     NameElement,
@@ -20,6 +21,7 @@ ContactElement = Union[
     DobElement,
     OsiPassengerTypeFlagElement,
     SsrTicketNumberElement,
+    AutomatedSsrElement,
 ]
 
 PassengerKey = tuple
@@ -74,6 +76,15 @@ def cross_reference_passengers(
             order.append(key)
 
     for element in contact_elements:
+        if isinstance(element, AutomatedSsrElement):
+            # VGML/SMSW/etc. may reference a passenger who is being
+            # cancelled or replaced in this same message (e.g. a name
+            # change dropping a special-service request tied to the
+            # old name) -- not an error, and not this layer's job to
+            # resolve. Captured by the caller via contact_elements;
+            # nothing to attach to a BookingPassenger record.
+            continue
+
         name_ref = getattr(element, "name", None)
         if name_ref is None:
             continue
@@ -180,7 +191,7 @@ def validate_party_size(
             f"NAME elements declare a total party size of "
             f"{total_name_party}, but the segment requests "
             f"{segment_number_in_party} seat(s). This can be legitimate "
-            f"(REQ03 p.11: infant inclusion in number_in_party is "
-            f"bilateral-agreement-dependent) but is worth a human check."
+            f"e.g. infant inclusion in number_in_party is "
+            f"bilateral-agreement-dependent). Recheck needed."
         ]
     return []

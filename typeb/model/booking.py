@@ -1,10 +1,12 @@
 from __future__ import annotations
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, computed_field
 
 from typeb.model.common import UnrecognizedLine
 from typeb.model.elements import (
+    AutomatedSsrElement,
     NameElement,
     OsiContactAddressElement,
+    OsiPartyCountElement,
     SegmentElement,
     SsrGroupFareElement,
     SsrGroupSeatElement,
@@ -29,6 +31,7 @@ class BookingMessage(BaseModel):
     envelope: Envelope
     passengers: list[BookingPassenger]
     name_elements: list[NameElement]
+    replacement_name_elements: list[NameElement] = []
     group_placeholders: list[GroupPlaceholder]
     arrival_elements: list[SegmentElement]
     segments: list[SegmentElement]
@@ -36,5 +39,12 @@ class BookingMessage(BaseModel):
     group_fare_info: list[SsrGroupFareElement]
     group_seat_requests: list[SsrGroupSeatElement]
     contact_addresses: list[OsiContactAddressElement]
+    party_count_notices: list[OsiPartyCountElement] = []
+    automated_ssrs: list[AutomatedSsrElement] = []
     warnings: list[str]
     unrecognized_lines: list[UnrecognizedLine]
+
+    @computed_field
+    @property
+    def is_name_change(self) -> bool:
+        return bool(self.replacement_name_elements)

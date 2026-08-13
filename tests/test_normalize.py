@@ -78,8 +78,8 @@ avn
 aa800 f 01jun cgkdps
 nnnn
 """
-    clean_envelope, clean_body = parse_envelope(_CLEAN_AVN)
-    messy_envelope, messy_body = parse_envelope(messy)
+    clean_envelope, clean_body, _ = parse_envelope(_CLEAN_AVN)
+    messy_envelope, messy_body, _ = parse_envelope(messy)
 
     assert messy_envelope == clean_envelope
     assert messy_body == clean_body
@@ -97,7 +97,7 @@ def test_crlf_and_extra_blank_lines_dont_break_booking_parse():
         "1RAHARJO/BAMBANGMR\r\n"
         "8G083F24SEP CGKDPS NN1 0910 1015\r\n"
     )
-    envelope, body = parse_envelope(messy)
+    envelope, body, _ = parse_envelope(messy)
     assert envelope.message_identifier is None
     assert len(envelope.record_locators) == 1
     assert envelope.record_locators[0].raw == (

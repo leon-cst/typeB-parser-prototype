@@ -7,7 +7,7 @@ from typeb.reply.decision import ReplyDecision, SegmentDecision
 
 
 def _build_booking_message(raw: str) -> BookingMessage:
-    envelope, body_lines = parse_envelope(raw)
+    envelope, body_lines, _ = parse_envelope(raw)
     name_elements = [parse_name_element(body_lines[0])]
     segments = [parse_segment_element(body_lines[1])]
     return BookingMessage(

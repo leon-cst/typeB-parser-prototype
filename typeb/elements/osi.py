@@ -1,13 +1,18 @@
 from __future__ import annotations
 
+import re
+
 from typeb.elements.contact import is_dob_shape, is_email_shape, parse_dob, parse_email_contact
 from typeb.elements.errors import ElementParseError, UnrecognizedElementError
 from typeb.elements.name import parse_name_reference
 from typeb.model.elements import (
     OsiContactAddressElement,
+    OsiPartyCountElement,
     OsiPassengerTypeFlagElement,
     OsiRecordLocatorElement,
 )
+
+_TCP_RE = re.compile(r"^TCP(\d{1,3})$")
 
 
 def _parse_osi_contact_address(line: str, tokens: list[str]) -> OsiContactAddressElement:
@@ -55,6 +60,22 @@ def _parse_osi_record_locator(line: str, tokens: list[str]):
     )
 
 
+def _parse_osi_party_count(line: str, tokens: list[str]) -> OsiPartyCountElement:
+    # REQ03 section 25 Option-1: "OSI <airline> TCP<n> <name>...". Names
+    # may be a partial list -- total_party_count is the authoritative
+    # figure (bilateral agreement), so 0 or more name tokens is valid.
+    m = _TCP_RE.match(tokens[2])
+    if not m:
+        raise ElementParseError(f"OSI TCP line malformed: {line!r}")
+    names = [parse_name_reference(t) for t in tokens[3:]]
+    return OsiPartyCountElement(
+        raw=line.strip(),
+        airline_code=tokens[1],
+        total_party_count=int(m.group(1)),
+        names=names,
+    )
+
+
 def parse_osi_line(line: str):
     stripped = line.strip()
     tokens = stripped.split()
@@ -72,11 +93,13 @@ def parse_osi_line(line: str):
         return _parse_osi_record_locator(stripped, tokens)
     if "CHD" in tokens or "INF" in tokens:
         return _parse_osi_passenger_type_flag(stripped, tokens)
+    if _TCP_RE.match(tokens[2]):
+        return _parse_osi_party_count(stripped, tokens)
     if len(tokens) >= 3 and tokens[2].startswith("CTC"):
         return _parse_osi_contact_address(stripped, tokens)
 
     raise UnrecognizedElementError(
         f"No parser implemented yet for this OSI shape (recognized: "
         f"email 'E/...', DOB 'DOB/...', 'RLOC', passenger-type flag "
-        f"'CHD'/'INF', contact address 'CTC*'): {line!r}"
+        f"'CHD'/'INF', party count 'TCP<n>', contact address 'CTC*'): {line!r}"
     )

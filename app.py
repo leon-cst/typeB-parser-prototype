@@ -72,7 +72,7 @@ def parse_message():
         }), 400
 
     try:
-        envelope, _ = parse_envelope(raw)
+        envelope, _, envelope_warnings = parse_envelope(raw)
     except EnvelopeParseError as e:
         return jsonify({"error": str(e)}), 400
 

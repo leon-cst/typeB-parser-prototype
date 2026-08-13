@@ -7,6 +7,7 @@ _SEGMENT_FIRST_TOKEN_RE = re.compile(r"^[A-Z0-9]{2}\d{2,4}[A-Z]\d{2}[A-Z]{3}$")
 _AVAIL_FIRST_TOKEN_RE = re.compile(r"^[A-Z0-9]{2}\d{1,4}[A-Z]?$")
 _RECAP_LINE_START_RE = re.compile(r"^[A-Z0-9]{2}\d{1,4}[A-Z]?/")
 _MARKERS = {"NNNN", "ARNK", "//"}
+_CHNT = "CHNT"
 _SEGMENT_FIRST_TOKEN_NO_DATE_RE = re.compile(r"^[A-Z0-9]{2}\d{2,4}[A-Z]$")
 _BARE_DATE_RE = re.compile(r"^\d{2}[A-Z]{3}$")
 
@@ -31,6 +32,7 @@ class ElementKind(str, Enum):
     SSR = "SSR"
     OSI = "OSI"
     MARKER = "MARKER"
+    CHNT = "CHNT"
     UNKNOWN = "UNKNOWN"
 
 
@@ -38,6 +40,9 @@ def classify_line(line: str) -> ElementKind:
     stripped = _reglue_split_date(line.strip())
     if stripped in _MARKERS:
         return ElementKind.MARKER
+
+    if stripped == _CHNT:
+        return ElementKind.CHNT
     
     if stripped.startswith("SSR "):
         return ElementKind.SSR

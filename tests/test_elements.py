@@ -5,7 +5,7 @@ import pytest
 
 from typeb.elements.availability import parse_availability_line
 from typeb.elements.errors import ElementParseError
-from typeb.elements.name import parse_name_element
+from typeb.elements.name import parse_name_element, split_name_change_boundary
 from typeb.elements.recap import parse_recap_line
 from typeb.elements.segment import parse_segment_element
 
@@ -270,3 +270,44 @@ def test_recap_single_date_line_without_route_is_all():
 def test_recap_ambiguous_slash_count_raises():
     with pytest.raises(ElementParseError, match="expected 1.*or 2"):
         parse_recap_line("8G123/16JUN26/EXTRA/EXTRA")
+
+
+# --------------------------------------------------------------------------
+# split_name_change_boundary -- CHNT (REQ03 sections 25/30)
+# --------------------------------------------------------------------------
+
+def test_split_name_change_no_chnt_returns_everything_as_current():
+    current, replacement = split_name_change_boundary(["1AAAAA/RMR"])
+    assert [n.raw for n in current] == ["1AAAAA/RMR"]
+    assert replacement == []
+
+
+def test_split_name_change_single_swap():
+    current, replacement = split_name_change_boundary(
+        ["1AAAAA/RMR", "CHNT", "1BBBBB/SMR"]
+    )
+    assert [n.raw for n in current] == ["1AAAAA/RMR"]
+    assert [n.raw for n in replacement] == ["1BBBBB/SMR"]
+
+
+def test_split_name_change_multiple_lines_each_side():
+    current, replacement = split_name_change_boundary(
+        ["1AAAAA/RMR 1BBBBB/BMR", "CHNT", "1CCCCC/CMR 1DDDDD/DMR"]
+    )
+    assert [n.raw for n in current] == ["1AAAAA/RMR", "1BBBBB/BMR"]
+    assert [n.raw for n in replacement] == ["1CCCCC/CMR", "1DDDDD/DMR"]
+
+
+def test_split_name_change_no_names_before_chnt_raises():
+    with pytest.raises(ElementParseError, match="no NAME line before"):
+        split_name_change_boundary(["CHNT", "1BBBBB/SMR"])
+
+
+def test_split_name_change_no_names_after_chnt_raises():
+    with pytest.raises(ElementParseError, match="no NAME line after"):
+        split_name_change_boundary(["1AAAAA/RMR", "CHNT"])
+
+
+def test_split_name_change_duplicate_chnt_raises():
+    with pytest.raises(ElementParseError, match="more than one CHNT"):
+        split_name_change_boundary(["1AAAAA/RMR", "CHNT", "1BBBBB/SMR", "CHNT", "1CCCCC/TMR"])

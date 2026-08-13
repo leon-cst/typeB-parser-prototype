@@ -214,6 +214,21 @@ class OsiContactAddressElement(BaseModel):
     detail: str
 
 
+class OsiPartyCountElement(BaseModel):
+    """OSI <airline> TCP<n> <name>... -- REQ03 section 25 Option-1: the
+    non-group "who else is in this booking" list. Names here are kept
+    as raw NameReferences, not cross-referenced to passengers -- REQ03's
+    own examples show names deliberately omitted as long as
+    total_party_count is correct (bilateral agreement), so an
+    incomplete name list here is expected, not an error."""
+    model_config = ConfigDict(frozen=True, str_strip_whitespace=True, str_to_upper=True)
+
+    raw: str
+    airline_code: str
+    total_party_count: int
+    names: list[NameReference]
+
+
 class SsrGroupFareElement(BaseModel):
     model_config = ConfigDict(frozen=True, str_strip_whitespace=True, str_to_upper=True)
 

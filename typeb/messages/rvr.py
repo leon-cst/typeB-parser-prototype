@@ -23,7 +23,8 @@ _WRONG_FAMILY_KINDS = {
 
 
 def parse_recap_message(raw: str) -> RecapMessage:
-    envelope, body_lines = parse_envelope(raw)
+    # RecapMessage has no warnings field yet
+    envelope, body_lines, _envelope_warnings = parse_envelope(raw)
 
     if envelope.effective_identifier != "RVR":
         raise ElementParseError(

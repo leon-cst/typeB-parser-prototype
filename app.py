@@ -9,6 +9,7 @@ from typeb.elements.errors import ElementParseError
 from typeb.envelope.parser import EnvelopeParseError, parse_envelope
 from typeb.messages.avn import parse_availability_message
 from typeb.messages.booking import parse_booking_message
+from typeb.messages.dvd import parse_dvd_message
 from typeb.messages.rvr import parse_recap_message
 from typeb.tables import loader
 
@@ -37,6 +38,7 @@ _ORCHESTRATORS = {
     "BOOKING": parse_booking_message,
     "AVN": parse_availability_message,
     "RVR": parse_recap_message,
+    "DVD": parse_dvd_message,
 }
 
 def _current_ddhhmm() -> str:
@@ -72,6 +74,10 @@ def parse_message():
         }), 400
 
     try:
+        # envelope_warnings is available here (dispatch-time parse) but
+        # deliberately not surfaced -- BOOKING already returns the same
+        # warnings via message.warnings (see typeb.messages.booking);
+        # AVN/RVR have no warnings field yet (see typeb.messages.avn/rvr).
         envelope, _, envelope_warnings = parse_envelope(raw)
     except EnvelopeParseError as e:
         return jsonify({"error": str(e)}), 400

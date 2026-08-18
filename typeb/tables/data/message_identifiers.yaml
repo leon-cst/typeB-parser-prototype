@@ -107,6 +107,7 @@ entries:
     description: Divide PNR
     meta:
       has_record_locator: true  # REQ03 p.63-97: every DVD example has a record locator line immediately after the identifier
+      supported: true
   - code: INC
     category: reservation
     description: Request for an increase in block size (bilateral)

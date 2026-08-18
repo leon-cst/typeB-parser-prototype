@@ -205,6 +205,21 @@ class OsiRecordLocatorElement(BaseModel):
     record_locator: str
 
 
+class OsiOriginalLocatorElement(BaseModel):
+    """OSI YY RLOC <glued> -- REQ03 section 24: the original PNR code a
+    DVD message points back to. Distinct shape from OsiRecordLocatorElement
+    (glued, no repeated airline code) and a different meaning (points to
+    the PNR *before* the divide, not another airline's own PNR for the
+    same booking). glued_locator is kept unsplit -- booking office vs.
+    record locator boundary isn't reliably determinable, see the
+    RecordLocator model's own fixed-width city-code caveat."""
+    model_config = ConfigDict(frozen=True, str_strip_whitespace=True, str_to_upper=True)
+
+    raw: str
+    airline_code: str
+    glued_locator: str
+
+
 class OsiContactAddressElement(BaseModel):
     model_config = ConfigDict(frozen=True, str_strip_whitespace=True, str_to_upper=True)
 

@@ -34,12 +34,13 @@ def test_message_identifiers_contains_expected_codes():
 
 
 def test_supported_flags_match_current_scope():
-    # Current scope per typeb_parser_handoff.md: AVN, RVR, booking-hold.
+    # Current scope per typeb_parser_handoff.md: AVN, RVR, booking-hold,
+    # DVD (divide PNR).
     assert loader.is_supported_message_identifier("AVN")
     assert loader.is_supported_message_identifier("RVR")
     assert loader.is_supported_message_identifier("BOOKING")
+    assert loader.is_supported_message_identifier("DVD")
     # Everything else should be loaded but NOT marked supported yet.
-    assert not loader.is_supported_message_identifier("DVD")
     assert not loader.is_supported_message_identifier("TLR")
     assert not loader.is_supported_message_identifier("AVS")
 

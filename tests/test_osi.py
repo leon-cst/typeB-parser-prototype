@@ -87,6 +87,22 @@ def test_osi_party_count_no_names():
     assert osi.names == []
 
 
+def test_osi_original_locator_glued_shape():
+    # REQ03 section 24: "OSI YY RLOC HDQ8GCPNRSJ" -- distinct 4-token
+    # shape from section 17's 5-token "OSI NH RLOC NH CPNRNH"
+    osi = parse_osi_line("OSI YY RLOC HDQ8GCPNRSJ")
+    assert osi.airline_code == "YY"
+    assert osi.glued_locator == "HDQ8GCPNRSJ"
+
+
+def test_osi_record_locator_5_token_shape_still_works():
+    # REQ03 section 17 -- unaffected by the new 4-token shape
+    osi = parse_osi_line("OSI NH RLOC NH CPNRNH")
+    assert osi.airline_code == "NH"
+    assert osi.record_locator_airline == "NH"
+    assert osi.record_locator == "CPNRNH"
+
+
 def test_osi_unrecognized_shape_raises_clearly():
     with pytest.raises(ElementParseError, match="No parser implemented yet for this OSI shape"):
         parse_osi_line("OSI BA TKNO 1261234567890")

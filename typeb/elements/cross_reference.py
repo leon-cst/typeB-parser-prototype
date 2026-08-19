@@ -97,7 +97,32 @@ def cross_reference_passengers(
             # one person it means.
             continue
 
-        key = _passenger_key(name_ref.surname, name_ref.given_name, name_ref.title)
+        if name_ref.surname is None:
+            candidates = [
+                k for k in pool
+                if k[1] == name_ref.given_name and k[2] == name_ref.title
+            ]
+            if len(candidates) == 1:
+                key = candidates[0]
+            elif not candidates:
+                raise CrossReferenceError(
+                    f"{type(element).__name__} references a passenger not "
+                    f"found in any NAME element: given_name="
+                    f"{name_ref.given_name!r}, title={name_ref.title!r} "
+                    f"(from line: {element.raw!r})"
+                )
+            else:
+                raise CrossReferenceError(
+                    f"{type(element).__name__} references "
+                    f"given_name={name_ref.given_name!r}, "
+                    f"title={name_ref.title!r} without a surname, and "
+                    f"{len(candidates)} different NAME elements match -- "
+                    f"can't tell which one this means (from line: "
+                    f"{element.raw!r})"
+                )
+        else:
+            key = _passenger_key(name_ref.surname, name_ref.given_name, name_ref.title)
+
         record = pool.get(key)
         if record is None:
             raise CrossReferenceError(
@@ -181,17 +206,13 @@ def _set_passenger_type(record: dict, new_type: str, element: ContactElement) ->
 def validate_party_size(
     name_elements: list[NameElement], segment_number_in_party: int
 ) -> list[str]:
-    # Every NAME element's number_in_party counts toward the total,
-    # whether or not individual names are known -- a group placeholder
-    # like "6SEAMEN" or a surname-only entry like "5ARDMORE" still
-    # represents that many real seats.
     total_name_party = sum(ne.number_in_party for ne in name_elements)
     if total_name_party != segment_number_in_party:
         return [
             f"NAME elements declare a total party size of "
             f"{total_name_party}, but the segment requests "
             f"{segment_number_in_party} seat(s). This can be legitimate "
-            f"e.g. infant inclusion in number_in_party is "
-            f"bilateral-agreement-dependent). Recheck needed."
+            f"(REQ03 p.11: infant inclusion in number_in_party is "
+            f"bilateral-agreement-dependent) but is worth a human check."
         ]
     return []

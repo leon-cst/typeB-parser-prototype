@@ -1,11 +1,11 @@
 """
-Cross-reference layer tests. The "full pipeline" tests use only lines
-confirmed to parse from the real coworker message -- the two adult+
-infant NAME lines were flagged as out-of-spec and don't parse at all
-(see test_elements.py::test_name_wrong_token_count_raises_rather_than_guessing),
-so they're not part of any end-to-end test here. Building a fabricated
-resolution for that open question would defeat the point of raising on
-ambiguity in the first place.
+Cross-reference layer tests. See test_infant_via_shared_surname_title_suffix
+below for the adult+infant shared-surname NAME lines from the real
+coworker message (e.g. "2KUSUMA/BUDISANTOSOMR/BAYIBUDIINF") -- these
+now parse and cross-reference correctly (previously flagged as
+out-of-spec; fixed by teaching parse_name_reference and
+cross_reference_passengers to resolve a no-surname, given_name+title
+SSR/OSI reference against its shared-surname NAME group).
 """
 import pytest
 
@@ -14,7 +14,7 @@ from typeb.elements.cross_reference import (
     cross_reference_passengers,
     validate_party_size,
 )
-from typeb.elements.name import parse_name_element
+from typeb.elements.name import parse_name_element, parse_name_line
 from typeb.elements.osi import parse_osi_line
 from typeb.elements.ssr import parse_ssr_line
 
@@ -199,3 +199,74 @@ def test_group_placeholder_contributes_to_party_size():
     names = [parse_name_element("6SEAMEN")]
     # 6SEAMEN legitimately represents 6 seats -- matches a 6-seat segment
     assert validate_party_size(names, segment_number_in_party=6) == []
+
+
+def test_infant_via_shared_surname_title_suffix():
+    # "1BAYIBUDIINF" has no surname/slash -- INF is a recognized title
+    # suffix, so it should resolve to the infant sharing KUSUMA's
+    # surname from the shared-surname NAME group, not be treated as a
+    # literal surname "BAYIBUDIINF".
+    names = parse_name_line("2KUSUMA/BUDISANTOSOMR/BAYIBUDIINF")
+    contacts = [
+        parse_ssr_line(
+            "SSR TKNE NH DILDPS 0189U25AUG-1BAYIBUDIINF.2051234567892C2"
+        )
+    ]
+    passengers = cross_reference_passengers(names, contacts)
+
+    infant = next(p for p in passengers if p.given_name == "BAYIBUDI")
+    assert infant.surname == "KUSUMA"
+    assert infant.title == "INF"
+    assert infant.ticket_numbers[0].ticket_number == "2051234567892C2"
+
+
+def test_ambiguous_given_name_title_reference_raises():
+    names = parse_name_line("2AAAAA/JOHNMR/BAYIINF") + parse_name_line(
+        "2BBBBB/JANEMR/BAYIINF"
+    )
+    contacts = [
+        parse_ssr_line("SSR TKNE NH DILDPS 0189U25AUG-1BAYIINF.2051234567892C2")
+    ]
+    with pytest.raises(CrossReferenceError, match="2 different NAME elements"):
+        cross_reference_passengers(names, contacts)
+
+
+def test_real_dilaug_message_full_pipeline():
+    # Verbatim real message: 3 adult+infant/child shared-surname NAME
+    # lines plus 6 SSR TKNE lines, one per passenger.
+    names = (
+        parse_name_line("2KUSUMA/BUDISANTOSOMR/BAYIBUDIINF")
+        + parse_name_line("1PRATAMA/ARIELUCYMSTR")
+        + parse_name_line("2WIJAYA/RINAMAHARANIMRS/SIREGAR/BAYIRINAMSTR")
+        + parse_name_line("1PUTRA/KEVINANGGARAMSTR")
+    )
+    contacts = [
+        parse_ssr_line(
+            "SSR TKNE NH DILDPS 0189U25AUG-1KUSUMA/BUDISANTOSOMR.2051234567891C1"
+        ),
+        parse_ssr_line(
+            "SSR TKNE NH DILDPS 0189U25AUG-1BAYIBUDIINF.2051234567892C2"
+        ),
+        parse_ssr_line(
+            "SSR TKNE NH DILDPS 0189U25AUG-1PRATAMA/ARIELUCYMSTR.2051234567893C3"
+        ),
+        parse_ssr_line(
+            "SSR TKNE NH DILDPS 0189U25AUG-1WIJAYA/RINAMAHARANIMRS.2051234567841C4"
+        ),
+        parse_ssr_line(
+            "SSR TKNE NH DILDPS 0189U25AUG-1SIREGAR/BAYIRINAMSTR.2051234567895C5"
+        ),
+        parse_ssr_line(
+            "SSR TKNE NH DILDPS 0189U25AUG-1PUTRA/KEVINANGGARAMSTR.2051234567861C6"
+        ),
+    ]
+
+    passengers = cross_reference_passengers(names, contacts)
+
+    assert len(passengers) == 6
+    by_ticket = {p.ticket_numbers[0].ticket_number: p for p in passengers}
+
+    assert by_ticket["2051234567892C2"].surname == "KUSUMA"
+    assert by_ticket["2051234567892C2"].given_name == "BAYIBUDI"
+    assert by_ticket["2051234567895C5"].surname == "SIREGAR"
+    assert by_ticket["2051234567895C5"].given_name == "BAYIRINA"

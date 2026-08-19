@@ -12,10 +12,8 @@ class Person(BaseModel):
 
     model_config = ConfigDict(frozen=True, str_strip_whitespace=True, str_to_upper=True)
 
-    surname: str | None = None  # only set for the distinct-surnames shape
-    given_name: str | None  # None when a title occupies this person's
-    # only slot and there's no name left (e.g. "1DUVALIER/MISS" -- no
-    # first/middle name was given at all, per REQ03 section 9)
+    surname: str | None = None 
+    given_name: str | None
     title: str | None
 
 
@@ -25,14 +23,12 @@ class NameElement(BaseModel):
 
     raw: str
     number_in_party: int
-    surname: str  # also holds the group name for placeholder lines
-    people: list[Person]  # empty for group-placeholder lines
+    surname: str 
+    people: list[Person]  
     is_group_placeholder: bool
-    group_name_suffix: str | None = None  # e.g. "TOUR" in "30SITA/TOUR" --
-    # only set for the slash-form group placeholder, None for the
-    # no-slash form (e.g. "6SEAMEN") and for ordinary NAME elements
-    seat_modifiers: list[str]  # "EXST" and/or "CBBG", usually empty
-    uses_distinct_surnames: bool  # see docstring above
+    group_name_suffix: str | None = None
+    seat_modifiers: list[str] 
+    uses_distinct_surnames: bool
 
 
 class SegmentElement(BaseModel):
@@ -45,8 +41,7 @@ class SegmentElement(BaseModel):
     airline_code: str
     flight_number: str
     reservation_booking_designator: str  # RBD / class of service
-    date_raw: str  # ddMMM, no year -- REQ02/REQ03 note year presence is
-    # bilateral-agreement-dependent; kept raw rather than guessing
+    date_raw: str 
     board_point: str
     off_point: str
     action_code: str  # cross-reference typeb.tables.loader.segment_status_codes()
@@ -93,13 +88,11 @@ class RecapSingleDateLine(BaseModel):
 
 
 class NameReference(BaseModel):
-    """A reference to a single already-declared passenger, as embedded
-    within an SSR or OSI line. """
     model_config = ConfigDict(frozen=True, str_strip_whitespace=True, str_to_upper=True)
 
     raw: str
     leading_number: int | None
-    surname: str
+    surname: str | None
     given_name: str | None
     title: str | None
 

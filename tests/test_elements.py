@@ -5,7 +5,7 @@ import pytest
 
 from typeb.elements.availability import parse_availability_line
 from typeb.elements.errors import ElementParseError
-from typeb.elements.name import parse_name_element, split_name_change_boundary
+from typeb.elements.name import parse_name_element, parse_name_reference, split_name_change_boundary
 from typeb.elements.recap import parse_recap_line
 from typeb.elements.segment import parse_segment_element
 
@@ -311,3 +311,30 @@ def test_split_name_change_no_names_after_chnt_raises():
 def test_split_name_change_duplicate_chnt_raises():
     with pytest.raises(ElementParseError, match="more than one CHNT"):
         split_name_change_boundary(["1AAAAA/RMR", "CHNT", "1BBBBB/SMR", "CHNT", "1CCCCC/TMR"])
+
+
+# --------------------------------------------------------------------------
+# parse_name_reference -- SSR/OSI embedded name references
+# --------------------------------------------------------------------------
+
+def test_name_reference_bare_surname_no_title_suffix():
+    ref = parse_name_reference("1ALLEN")
+    assert ref.surname == "ALLEN"
+    assert ref.given_name is None
+    assert ref.title is None
+
+
+def test_name_reference_given_name_and_title_suffix_no_surname():
+    # No slash, but INF is a recognized title -- resolved as given
+    # name + title, not treated as a literal surname.
+    ref = parse_name_reference("1BAYIBUDIINF")
+    assert ref.surname is None
+    assert ref.given_name == "BAYIBUDI"
+    assert ref.title == "INF"
+
+
+def test_name_reference_slash_shape_unaffected():
+    ref = parse_name_reference("1KUSUMA/BUDISANTOSOMR")
+    assert ref.surname == "KUSUMA"
+    assert ref.given_name == "BUDISANTOSO"
+    assert ref.title == "MR"

@@ -199,7 +199,7 @@ def parse_name_line(line: str) -> list[NameElement]:
         if not _LEADING_DIGITS_RE.match(group) or group.rstrip("0123456789") == "":
             raise ElementParseError(
                 f"NAME line token {i + 1} of {len(groups)} ({group!r}) does "
-                f"not begin a name group, every space-separated group on "
+                f"not begin a name group -- every space-separated group on "
                 f"a NAME line must start with its own 1-3 digit number in "
                 f"party, immediately followed by the name: {line!r}"
             )
@@ -210,7 +210,6 @@ def parse_name_line(line: str) -> list[NameElement]:
 def split_name_change_boundary(
     name_lines: list[str],
 ) -> tuple[list[NameElement], list[NameElement]]:
-
     if _CHNT_MARKER not in name_lines:
         return [g for line in name_lines for g in parse_name_line(line)], []
 
@@ -250,8 +249,21 @@ def parse_name_reference(token: str) -> NameReference:
         raise ElementParseError(f"Name reference missing a name: {token!r}")
 
     if "/" not in rest:
+        given_name, title = _split_glued_title(rest)
+        if title is not None:
+            # given name + title suffix, no surname of its own -- an
+            # infant/child referenced via the adult's shared-surname
+            # NAME group (e.g. "1BAYIBUDIINF"). cross_reference_passengers
+            # matches this on (given_name, title) alone.
+            return NameReference(
+                raw=stripped,
+                leading_number=leading_number,
+                surname=None,
+                given_name=given_name,
+                title=title,
+            )
         # Bare surname, no given name/title (REQ03 section 25: "OSI YY
-        # TCP3 1ALLEN") same no-slash grammar NameElement already
+        # TCP3 1ALLEN") -- same no-slash grammar NameElement already
         # accepts for a group placeholder, here for a single reference.
         return NameReference(
             raw=stripped,

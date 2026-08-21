@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typeb.elements.cross_reference import cross_reference_passengers, validate_party_size
 from typeb.elements.errors import ElementParseError, UnrecognizedElementError
-from typeb.elements.name import split_name_change_boundary
+from typeb.elements.name import apply_name_changes, split_name_change_boundary
 from typeb.elements.osi import parse_osi_line
 from typeb.elements.segment import parse_segment_element
 from typeb.elements.ssr import parse_ssr_line
@@ -39,6 +39,7 @@ def parse_booking_message(raw: str) -> BookingMessage:
 
     for kind, line in tokenize_body(body_lines):
         if len(line) > _DEFAULT_MAX_LINE_LENGTH:
+
             warnings.append(
                 f"Line excluded from parsing, {len(line)} characters "
                 f"exceeding the {_DEFAULT_MAX_LINE_LENGTH}-character "
@@ -82,17 +83,18 @@ def parse_booking_message(raw: str) -> BookingMessage:
                 UnrecognizedLine(raw=line, tokenizer_kind=kind.value, reason=str(e))
             )
 
-    name_elements, replacement_name_elements = split_name_change_boundary(name_lines)
+    name_elements, name_changes = split_name_change_boundary(name_lines)
 
     # No reliable wire-level signal distinguishes ARRIVAL from SEGMENT
     # lines, so this stays empty until a real signal is found.
     arrival_elements: list[SegmentElement] = []
 
-    current_name_elements = (
-        replacement_name_elements if replacement_name_elements else name_elements
-    )
 
-    passengers = cross_reference_passengers(current_name_elements, contact_elements)
+    current_name_elements = apply_name_changes(name_elements, name_changes)
+
+    passengers = cross_reference_passengers(
+        current_name_elements, contact_elements, name_changes
+    )
 
     grps_by_group_name: dict[str, int] = {}
     for e in contact_elements:
@@ -138,7 +140,7 @@ def parse_booking_message(raw: str) -> BookingMessage:
         envelope=envelope,
         passengers=passengers,
         name_elements=name_elements,
-        replacement_name_elements=replacement_name_elements,
+        name_changes=name_changes,
         group_placeholders=group_placeholders,
         arrival_elements=arrival_elements,
         segments=segments,

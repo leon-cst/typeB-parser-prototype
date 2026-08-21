@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 
 from typeb.elements.errors import ElementParseError
-from typeb.model.elements import NameElement, NameReference, Person
+from typeb.model.elements import NameChange, NameElement, NameReference, Person
 from typeb.tables import loader
 
 _LEADING_DIGITS_RE = re.compile(r"^(\d{1,3})(.*)$")
@@ -207,9 +207,22 @@ def parse_name_line(line: str) -> list[NameElement]:
     return [parse_name_element(g) for g in groups]
 
 
+def _parse_name_change_pair(line: str) -> NameChange:
+    """One CHNT line: 'OLDNAME NEWNAME', e.g. '1AAAAA/RMR 1BBBBB/SMR'.
+    Exactly two name groups -- the old name and its replacement."""
+    groups = parse_name_line(line)
+    if len(groups) != 2:
+        raise ElementParseError(
+            f"CHNT pairing line must have exactly 2 name groups "
+            f"('OLDNAME NEWNAME'), got {len(groups)}: {line!r}"
+        )
+    old, new = groups
+    return NameChange(raw=line.strip(), old=old, new=new)
+
+
 def split_name_change_boundary(
     name_lines: list[str],
-) -> tuple[list[NameElement], list[NameElement]]:
+) -> tuple[list[NameElement], list[NameChange]]:
     if _CHNT_MARKER not in name_lines:
         return [g for line in name_lines for g in parse_name_line(line)], []
 
@@ -225,17 +238,37 @@ def split_name_change_boundary(
     if not before:
         raise ElementParseError(
             "CHNT appeared with no NAME line before it -- REQ03 section "
-            "25/30 requires the names being changed to precede CHNT."
+            "25/30 requires the full passenger list to precede CHNT."
         )
     if not after:
         raise ElementParseError(
             "CHNT appeared with no NAME line after it -- REQ03 section "
-            "25/30 requires the replacement names to follow CHNT."
+            "25/30 requires at least one OLDNAME NEWNAME pairing line "
+            "to follow CHNT."
         )
 
-    current_names = [g for line in before for g in parse_name_line(line)]
-    replacement_names = [g for line in after for g in parse_name_line(line)]
-    return current_names, replacement_names
+    passengers = [g for line in before for g in parse_name_line(line)]
+    name_changes = [_parse_name_change_pair(line) for line in after]
+
+    passenger_raws = {p.raw for p in passengers}
+    for change in name_changes:
+        if change.old.raw not in passenger_raws:
+            raise ElementParseError(
+                f"CHNT pairing line's old name doesn't match any "
+                f"passenger in the list before CHNT: {change.raw!r}"
+            )
+
+    return passengers, name_changes
+
+
+def apply_name_changes(
+    passengers: list[NameElement], name_changes: list[NameChange]
+) -> list[NameElement]:
+    if not name_changes:
+        return passengers
+
+    old_to_new = {change.old.raw: change.new for change in name_changes}
+    return [old_to_new.get(p.raw, p) for p in passengers]
 
 
 def parse_name_reference(token: str) -> NameReference:

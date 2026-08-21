@@ -14,7 +14,12 @@ from typeb.elements.cross_reference import (
     cross_reference_passengers,
     validate_party_size,
 )
-from typeb.elements.name import parse_name_element, parse_name_line
+from typeb.elements.name import (
+    apply_name_changes,
+    parse_name_element,
+    parse_name_line,
+    split_name_change_boundary,
+)
 from typeb.elements.osi import parse_osi_line
 from typeb.elements.ssr import parse_ssr_line
 
@@ -270,3 +275,59 @@ def test_real_dilaug_message_full_pipeline():
     assert by_ticket["2051234567892C2"].given_name == "BAYIBUDI"
     assert by_ticket["2051234567895C5"].surname == "SIREGAR"
     assert by_ticket["2051234567895C5"].given_name == "BAYIRINA"
+
+
+# --------------------------------------------------------------------------
+# cross_reference_passengers with name_changes -- CHNT (REQ03 sections 25/30)
+# --------------------------------------------------------------------------
+
+def test_name_change_displays_old_name_by_default():
+    old_passengers, changes = split_name_change_boundary(
+        ["1AAAAA/RMR", "CHNT", "1AAAAA/RMR 1BBBBB/SMR"]
+    )
+    new_passengers = apply_name_changes(old_passengers, changes)
+    result = cross_reference_passengers(new_passengers, [], changes)
+    assert len(result) == 1
+    assert result[0].surname == "AAAAA"
+    assert result[0].given_name == "R"
+
+
+def test_name_change_resolves_contact_data_against_old_name():
+    old_passengers, changes = split_name_change_boundary(
+        ["1AAAAA/RMR", "CHNT", "1AAAAA/RMR 1BBBBB/SMR"]
+    )
+    new_passengers = apply_name_changes(old_passengers, changes)
+    contacts = [
+        parse_ssr_line("SSR FOID 8G HK1/5102938475610293-1AAAAA/RMR"),
+    ]
+    result = cross_reference_passengers(new_passengers, contacts, changes)
+    assert result[0].surname == "AAAAA"
+    assert result[0].foid == "5102938475610293"
+
+
+def test_name_change_resolves_contact_data_against_new_name():
+    # A ticket issued after the rename references the new name -- must
+    # still resolve to the same passenger, still displayed under the
+    # old name. Per cross_reference_passengers' contract, the caller
+    # passes the POST-CHNT name list (as typeb.messages.booking does
+    # via apply_name_changes) so new-name references resolve directly;
+    # name_changes then adds the old-name alias and old-name display.
+    old_passengers, changes = split_name_change_boundary(
+        ["1AAAAA/RMR", "CHNT", "1AAAAA/RMR 1BBBBB/SMR"]
+    )
+    new_passengers = apply_name_changes(old_passengers, changes)
+    contacts = [
+        parse_ssr_line("SSR TKNE NH DILDPS 0189U25AUG-1BBBBB/SMR.2051234567891C1"),
+    ]
+    result = cross_reference_passengers(new_passengers, contacts, changes)
+    assert len(result) == 1
+    assert result[0].surname == "AAAAA"
+    assert result[0].ticket_numbers[0].ticket_number == "2051234567891C1"
+
+
+def test_no_name_changes_argument_behaves_as_before():
+    # Backward compatibility: omitting name_changes entirely (existing
+    # callers, or a message with no CHNT) behaves exactly as before.
+    names = [parse_name_element("1RED/PETER")]
+    result = cross_reference_passengers(names, [])
+    assert result[0].surname == "RED"

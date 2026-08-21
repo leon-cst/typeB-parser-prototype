@@ -4,6 +4,7 @@ from pydantic import BaseModel, ConfigDict, computed_field
 from typeb.model.common import UnrecognizedLine
 from typeb.model.elements import (
     AutomatedSsrElement,
+    NameChange,
     NameElement,
     OsiContactAddressElement,
     OsiPartyCountElement,
@@ -31,7 +32,9 @@ class BookingMessage(BaseModel):
     envelope: Envelope
     passengers: list[BookingPassenger]
     name_elements: list[NameElement]
-    replacement_name_elements: list[NameElement] = []
+    # old/new pairs from CHNT (REQ03 sections 25/30); empty when this
+    # message has no name change
+    name_changes: list[NameChange] = []
     group_placeholders: list[GroupPlaceholder]
     arrival_elements: list[SegmentElement]
     segments: list[SegmentElement]
@@ -47,4 +50,4 @@ class BookingMessage(BaseModel):
     @computed_field
     @property
     def is_name_change(self) -> bool:
-        return bool(self.replacement_name_elements)
+        return bool(self.name_changes)

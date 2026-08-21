@@ -6,6 +6,7 @@ from typeb.model.elements import (
     AutomatedSsrElement,
     DobElement,
     EmailContactElement,
+    NameChange,
     NameElement,
     OsiPassengerTypeFlagElement,
     SsrChildOrInfantFlagElement,
@@ -38,7 +39,9 @@ def _passenger_key(surname, given_name, title) -> PassengerKey:
 def cross_reference_passengers(
     name_elements: list[NameElement],
     contact_elements: list[ContactElement],
+    name_changes: list[NameChange] | None = None,
 ) -> list[BookingPassenger]:
+
     pool: dict[PassengerKey, dict] = {}
     order: list[PassengerKey] = []
 
@@ -75,6 +78,21 @@ def cross_reference_passengers(
             }
             order.append(key)
 
+
+    old_name_keys: dict[PassengerKey, PassengerKey] = {}
+    if name_changes:
+        for change in name_changes:
+            for person in change.new.people:
+                new_surname = person.surname if person.surname else change.new.surname
+                new_key = _passenger_key(new_surname, person.given_name, person.title)
+                if new_key not in pool:
+                    continue
+                for old_person in change.old.people:
+                    old_surname = old_person.surname if old_person.surname else change.old.surname
+                    old_key = _passenger_key(old_surname, old_person.given_name, old_person.title)
+                    pool[old_key] = pool[new_key]
+                    old_name_keys[new_key] = old_key
+
     for element in contact_elements:
         if isinstance(element, AutomatedSsrElement):
             # VGML/SMSW/etc. may reference a passenger who is being
@@ -98,6 +116,9 @@ def cross_reference_passengers(
             continue
 
         if name_ref.surname is None:
+            # No surname on the reference itself (e.g. an infant given
+            # only as "1BAYIBUDIINF") -- fall back to matching on
+            # (given_name, title) alone, but only if that's unambiguous.
             candidates = [
                 k for k in pool
                 if k[1] == name_ref.given_name and k[2] == name_ref.title
@@ -133,6 +154,10 @@ def cross_reference_passengers(
             )
 
         _apply_element(record, element)
+
+    for new_key, old_key in old_name_keys.items():
+        record = pool[new_key]
+        record["surname"], record["given_name"], record["title"] = old_key
 
     return [_finalize_passenger(pool[key]) for key in order]
 
@@ -206,6 +231,7 @@ def _set_passenger_type(record: dict, new_type: str, element: ContactElement) ->
 def validate_party_size(
     name_elements: list[NameElement], segment_number_in_party: int
 ) -> list[str]:
+
     total_name_party = sum(ne.number_in_party for ne in name_elements)
     if total_name_party != segment_number_in_party:
         return [

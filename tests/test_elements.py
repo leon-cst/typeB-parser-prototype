@@ -277,30 +277,54 @@ def test_recap_ambiguous_slash_count_raises():
 # --------------------------------------------------------------------------
 
 def test_split_name_change_no_chnt_returns_everything_as_current():
-    current, replacement = split_name_change_boundary(["1AAAAA/RMR"])
-    assert [n.raw for n in current] == ["1AAAAA/RMR"]
-    assert replacement == []
+    passengers, changes = split_name_change_boundary(["1AAAAA/RMR"])
+    assert [n.raw for n in passengers] == ["1AAAAA/RMR"]
+    assert changes == []
 
 
-def test_split_name_change_single_swap():
-    current, replacement = split_name_change_boundary(
-        ["1AAAAA/RMR", "CHNT", "1BBBBB/SMR"]
+def test_split_name_change_single_pair():
+    passengers, changes = split_name_change_boundary(
+        ["1AAAAA/RMR", "CHNT", "1AAAAA/RMR 1BBBBB/SMR"]
     )
-    assert [n.raw for n in current] == ["1AAAAA/RMR"]
-    assert [n.raw for n in replacement] == ["1BBBBB/SMR"]
+    assert [n.raw for n in passengers] == ["1AAAAA/RMR"]
+    assert len(changes) == 1
+    assert changes[0].old.raw == "1AAAAA/RMR"
+    assert changes[0].new.raw == "1BBBBB/SMR"
 
 
-def test_split_name_change_multiple_lines_each_side():
-    current, replacement = split_name_change_boundary(
-        ["1AAAAA/RMR 1BBBBB/BMR", "CHNT", "1CCCCC/CMR 1DDDDD/DMR"]
+def test_split_name_change_multiple_pairs_unambiguous_with_multiple_passengers():
+    # The scenario the old positional format couldn't express: two
+    # passengers in the same booking both changing names, explicitly
+    # paired so there's no ambiguity about who becomes who.
+    passengers, changes = split_name_change_boundary(
+        [
+            "1AAAAA/RMR 1BBBBB/BMR",
+            "CHNT",
+            "1AAAAA/RMR 1CCCCC/CMR",
+            "1BBBBB/BMR 1DDDDD/DMR",
+        ]
     )
-    assert [n.raw for n in current] == ["1AAAAA/RMR", "1BBBBB/BMR"]
-    assert [n.raw for n in replacement] == ["1CCCCC/CMR", "1DDDDD/DMR"]
+    assert [n.raw for n in passengers] == ["1AAAAA/RMR", "1BBBBB/BMR"]
+    assert len(changes) == 2
+    assert (changes[0].old.raw, changes[0].new.raw) == ("1AAAAA/RMR", "1CCCCC/CMR")
+    assert (changes[1].old.raw, changes[1].new.raw) == ("1BBBBB/BMR", "1DDDDD/DMR")
+
+
+def test_split_name_change_pair_line_wrong_group_count_raises():
+    with pytest.raises(ElementParseError, match="exactly 2 name groups"):
+        split_name_change_boundary(["1AAAAA/RMR", "CHNT", "1BBBBB/SMR"])
+
+
+def test_split_name_change_old_name_not_in_passenger_list_raises():
+    with pytest.raises(ElementParseError, match="doesn't match any passenger"):
+        split_name_change_boundary(
+            ["1AAAAA/RMR", "CHNT", "1ZZZZZ/XMR 1BBBBB/SMR"]
+        )
 
 
 def test_split_name_change_no_names_before_chnt_raises():
     with pytest.raises(ElementParseError, match="no NAME line before"):
-        split_name_change_boundary(["CHNT", "1BBBBB/SMR"])
+        split_name_change_boundary(["CHNT", "1AAAAA/RMR 1BBBBB/SMR"])
 
 
 def test_split_name_change_no_names_after_chnt_raises():
@@ -310,7 +334,9 @@ def test_split_name_change_no_names_after_chnt_raises():
 
 def test_split_name_change_duplicate_chnt_raises():
     with pytest.raises(ElementParseError, match="more than one CHNT"):
-        split_name_change_boundary(["1AAAAA/RMR", "CHNT", "1BBBBB/SMR", "CHNT", "1CCCCC/TMR"])
+        split_name_change_boundary(
+            ["1AAAAA/RMR", "CHNT", "1AAAAA/RMR 1BBBBB/SMR", "CHNT", "1CCCCC/TMR"]
+        )
 
 
 # --------------------------------------------------------------------------

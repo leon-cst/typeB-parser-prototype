@@ -41,7 +41,19 @@ def cross_reference_passengers(
     contact_elements: list[ContactElement],
     name_changes: list[NameChange] | None = None,
 ) -> list[BookingPassenger]:
+    """name_elements must be the POST-CHNT passenger list (each renamed
+    passenger's NEW name) -- e.g. via typeb.elements.name.apply_name_changes.
+    Passing the pre-CHNT list here silently breaks resolution of any
+    SSR/OSI line that references a passenger's new name.
 
+    When name_changes is given: each old name is aliased to the same
+    pool entry(ies) as its replacement, so a line referencing either
+    the old or the new name resolves correctly. For a plain rename
+    (one old name, one new name) the final BookingPassenger's identity
+    fields are overridden back to the old name for display. A split
+    (one old name, several new names) has no single old identity to
+    fall back to for each resulting passenger, so those display under
+    their new names."""
     pool: dict[PassengerKey, dict] = {}
     order: list[PassengerKey] = []
 
@@ -78,20 +90,50 @@ def cross_reference_passengers(
             }
             order.append(key)
 
-
+    # Alias each CHNT change's old name(s) to the same pool record(s)
+    # as the new name(s), so an SSR/OSI line referencing either the old
+    # or the new name resolves -- without this, a line still pointing
+    # at the old name (e.g. cancelling a service tied to it) would
+    # fail to match, since name_elements only carries the new names.
     old_name_keys: dict[PassengerKey, PassengerKey] = {}
     if name_changes:
         for change in name_changes:
-            for person in change.new.people:
-                new_surname = person.surname if person.surname else change.new.surname
-                new_key = _passenger_key(new_surname, person.given_name, person.title)
-                if new_key not in pool:
+            is_plain_rename = len(change.old) == 1 and len(change.new) == 1
+            for new_entry in change.new:
+                if new_entry.is_group_placeholder:
                     continue
-                for old_person in change.old.people:
-                    old_surname = old_person.surname if old_person.surname else change.old.surname
-                    old_key = _passenger_key(old_surname, old_person.given_name, old_person.title)
-                    pool[old_key] = pool[new_key]
-                    old_name_keys[new_key] = old_key
+                for person in new_entry.people:
+                    new_surname = person.surname if person.surname else new_entry.surname
+                    new_key = _passenger_key(new_surname, person.given_name, person.title)
+                    if new_key not in pool:
+                        continue
+                    if not is_plain_rename:
+                        # A split's resulting passengers have no single
+                        # old identity to fall back to -- they display
+                        # under their new names, but the old aggregate
+                        # name should still resolve any wire reference
+                        # that still uses it (e.g. an SSR issued before
+                        # the split).
+                        for old_entry in change.old:
+                            for old_person in old_entry.people:
+                                old_surname = (
+                                    old_person.surname if old_person.surname else old_entry.surname
+                                )
+                                old_key = _passenger_key(
+                                    old_surname, old_person.given_name, old_person.title
+                                )
+                                pool.setdefault(old_key, pool[new_key])
+                        continue
+                    for old_entry in change.old:
+                        for old_person in old_entry.people:
+                            old_surname = (
+                                old_person.surname if old_person.surname else old_entry.surname
+                            )
+                            old_key = _passenger_key(
+                                old_surname, old_person.given_name, old_person.title
+                            )
+                            pool[old_key] = pool[new_key]
+                            old_name_keys[new_key] = old_key
 
     for element in contact_elements:
         if isinstance(element, AutomatedSsrElement):
@@ -231,7 +273,10 @@ def _set_passenger_type(record: dict, new_type: str, element: ContactElement) ->
 def validate_party_size(
     name_elements: list[NameElement], segment_number_in_party: int
 ) -> list[str]:
-
+    # Every NAME element's number_in_party counts toward the total,
+    # whether or not individual names are known -- a group placeholder
+    # like "6SEAMEN" or a surname-only entry like "5ARDMORE" still
+    # represents that many real seats.
     total_name_party = sum(ne.number_in_party for ne in name_elements)
     if total_name_party != segment_number_in_party:
         return [

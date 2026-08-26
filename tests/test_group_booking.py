@@ -17,10 +17,10 @@ def test_name_group_shape():
 
 
 def test_name_no_slash_placeholder_still_unaffected():
-    n = parse_name_element("6SEAMEN")
+    n = parse_name_element("9SEAMEN")
     assert n.is_group_placeholder is True
     assert n.group_name_suffix is None
-    assert render_name_element(n) == "6SEAMEN"
+    assert render_name_element(n) == "9SEAMEN"
 
 
 def test_ssr_grpf_bare():
@@ -138,10 +138,10 @@ def test_group_with_all_individual_names():
 QU JFKRMTW
 .PARRMPA 051355
 PARPA 115Y10AUG
-5ARDMORE 3BATES 5DRUMMOND 3ENGLER 4HAYRES 5ZIMMERMAN 5CLARK
-DL119Y10AUG ORYJFK HK30/1435 1700
-TW209Y11AUG JFKSTL NN30/1550 1720
-SSR GRPS TW TCP30 SITA/TOUR
+9ARDMORE 9BATES 9DRUMMOND 9ENGLER 9HAYRES 9ZIMMERMAN 9CLARK
+DL119Y10AUG ORYJFK HK63/1435 1700
+TW209Y11AUG JFKSTL NN63/1550 1720
+SSR GRPS TW TCP63 SITA/TOUR
 SSR GRPF TW YNC
 SSR GRPF TW YNC PARNYCSTL FRF 3590
 OSI TW CTCA NYC HOLIDAY INN AGT ABC TRAVEL"""

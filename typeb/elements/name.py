@@ -102,6 +102,12 @@ def parse_name_element(line: str) -> NameElement:
         )
 
     if "/" not in rest:
+        if number_in_party < 9:
+            raise ElementParseError(
+                f"NAME group with no '/' and number_in_party={number_in_party} "
+                f"< 9 requires a title -- only 9 or more is treated as a "
+                f"group placeholder: {line!r}"
+            )
         return NameElement(
             raw=stripped,
             number_in_party=number_in_party,
@@ -154,6 +160,12 @@ def parse_name_element(line: str) -> NameElement:
         # individual-name grammars have already failed to match, and
         # only for a single trailing token that isn't a known title --
         # so this doesn't compete with or shadow either of them.
+        if number_in_party < 9:
+            raise ElementParseError(
+                f"NAME group/tour placeholder with number_in_party="
+                f"{number_in_party} < 9 requires a title -- only 9 or "
+                f"more is treated as a group placeholder: {line!r}"
+            )
         return NameElement(
             raw=stripped,
             number_in_party=number_in_party,
@@ -207,22 +219,91 @@ def parse_name_line(line: str) -> list[NameElement]:
     return [parse_name_element(g) for g in groups]
 
 
-def _parse_name_change_pair(line: str) -> NameChange:
-    """One CHNT line: 'OLDNAME NEWNAME', e.g. '1AAAAA/RMR 1BBBBB/SMR'.
-    Exactly two name groups -- the old name and its replacement."""
-    groups = parse_name_line(line)
-    if len(groups) != 2:
-        raise ElementParseError(
-            f"CHNT pairing line must have exactly 2 name groups "
-            f"('OLDNAME NEWNAME'), got {len(groups)}: {line!r}"
-        )
-    old, new = groups
-    return NameChange(raw=line.strip(), old=old, new=new)
+def _align_name_changes(
+    before: list[NameElement], after: list[NameElement], raw_before: str, raw_after: str
+) -> list[NameChange]:
+
+    before_counts: dict[str, int] = {}
+    after_counts: dict[str, int] = {}
+    for b in before:
+        before_counts[b.raw] = before_counts.get(b.raw, 0) + 1
+    for a in after:
+        after_counts[a.raw] = after_counts.get(a.raw, 0) + 1
+
+    anchors: list[tuple[int, int]] = []  # (before_index, after_index)
+    after_index_by_raw: dict[str, int] = {}
+    for j, a in enumerate(after):
+        if a.raw not in after_index_by_raw:
+            after_index_by_raw[a.raw] = j
+
+    last_after_index = -1
+    for i, b in enumerate(before):
+        if before_counts.get(b.raw) != 1 or after_counts.get(b.raw) != 1:
+            continue
+        j = after_index_by_raw.get(b.raw)
+        if j is None or j <= last_after_index:
+            continue
+        anchors.append((i, j))
+        last_after_index = j
+
+    changes: list[NameChange] = []
+    prev_i, prev_j = -1, -1
+    boundaries = anchors + [(len(before), len(after))]
+    for i, j in boundaries:
+        old_gap = before[prev_i + 1:i]
+        new_gap = after[prev_j + 1:j]
+        if old_gap or new_gap:
+            if not old_gap or not new_gap:
+                raise ElementParseError(
+                    f"Passenger list rewrite after CHNT doesn't align: "
+                    f"{len(old_gap)} unmatched entr{'y' if len(old_gap) == 1 else 'ies'} "
+                    f"before CHNT vs {len(new_gap)} after, with no way to "
+                    f"pair them. Before: {raw_before!r}. After: {raw_after!r}"
+                )
+            if len(old_gap) == len(new_gap):
+                for old_entry, new_entry in zip(old_gap, new_gap):
+                    changes.append(
+                        NameChange(
+                            raw=f"{old_entry.raw} -> {new_entry.raw}",
+                            old=[old_entry],
+                            new=[new_entry],
+                        )
+                    )
+            elif len(old_gap) == 1:
+                old_total = old_gap[0].number_in_party
+                new_total = sum(n.number_in_party for n in new_gap)
+                if old_total != new_total:
+                    raise ElementParseError(
+                        f"CHNT change for {old_gap[0].raw!r} declares "
+                        f"{old_total} pax before but {new_total} after -- "
+                        f"a split must preserve the total number in party."
+                    )
+                changes.append(
+                    NameChange(
+                        raw=f"{old_gap[0].raw} -> {' '.join(n.raw for n in new_gap)}",
+                        old=old_gap,
+                        new=new_gap,
+                    )
+                )
+            else:
+                raise ElementParseError(
+                    f"CHNT change has {len(old_gap)} unmatched entries "
+                    f"before CHNT mapping to {len(new_gap)} after -- only "
+                    f"a single entry splitting into multiple, or equal "
+                    f"counts on both sides, is supported -- not merging "
+                    f"or reshuffling a different number of entries at "
+                    f"once. Before: {[e.raw for e in old_gap]}, after: "
+                    f"{[e.raw for e in new_gap]}"
+                )
+        prev_i, prev_j = i, j
+
+    return changes
 
 
 def split_name_change_boundary(
     name_lines: list[str],
 ) -> tuple[list[NameElement], list[NameChange]]:
+
     if _CHNT_MARKER not in name_lines:
         return [g for line in name_lines for g in parse_name_line(line)], []
 
@@ -233,30 +314,26 @@ def split_name_change_boundary(
         )
 
     boundary = name_lines.index(_CHNT_MARKER)
-    before, after = name_lines[:boundary], name_lines[boundary + 1:]
+    before_lines, after_lines = name_lines[:boundary], name_lines[boundary + 1:]
 
-    if not before:
+    if not before_lines:
         raise ElementParseError(
             "CHNT appeared with no NAME line before it -- REQ03 section "
             "25/30 requires the full passenger list to precede CHNT."
         )
-    if not after:
+    if not after_lines:
         raise ElementParseError(
             "CHNT appeared with no NAME line after it -- REQ03 section "
-            "25/30 requires at least one OLDNAME NEWNAME pairing line "
-            "to follow CHNT."
+            "25/30 requires the full, rewritten passenger list to "
+            "follow CHNT."
         )
 
-    passengers = [g for line in before for g in parse_name_line(line)]
-    name_changes = [_parse_name_change_pair(line) for line in after]
+    passengers = [g for line in before_lines for g in parse_name_line(line)]
+    after_passengers = [g for line in after_lines for g in parse_name_line(line)]
 
-    passenger_raws = {p.raw for p in passengers}
-    for change in name_changes:
-        if change.old.raw not in passenger_raws:
-            raise ElementParseError(
-                f"CHNT pairing line's old name doesn't match any "
-                f"passenger in the list before CHNT: {change.raw!r}"
-            )
+    name_changes = _align_name_changes(
+        passengers, after_passengers, " ".join(before_lines), " ".join(after_lines)
+    )
 
     return passengers, name_changes
 
@@ -264,11 +341,31 @@ def split_name_change_boundary(
 def apply_name_changes(
     passengers: list[NameElement], name_changes: list[NameChange]
 ) -> list[NameElement]:
+    """Returns the post-CHNT passenger list: each changed entry
+    replaced by its new name(s) (a split contributes multiple entries
+    in place of the one it replaces); unaffected passengers unchanged.
+    Used for cross-referencing and party-size validation, which need
+    the current state -- the full pre-CHNT list stays on
+    BookingMessage.name_elements for audit."""
     if not name_changes:
         return passengers
 
-    old_to_new = {change.old.raw: change.new for change in name_changes}
-    return [old_to_new.get(p.raw, p) for p in passengers]
+    old_raw_to_new: dict[str, list[NameElement]] = {}
+    for change in name_changes:
+        for old_entry in change.old:
+            old_raw_to_new[old_entry.raw] = change.new
+
+    result: list[NameElement] = []
+    consumed_multi_old_raws: set[str] = set()
+    for p in passengers:
+        if p.raw in old_raw_to_new:
+            if p.raw in consumed_multi_old_raws:
+                continue
+            result.extend(old_raw_to_new[p.raw])
+            consumed_multi_old_raws.add(p.raw)
+        else:
+            result.append(p)
+    return result
 
 
 def parse_name_reference(token: str) -> NameReference:

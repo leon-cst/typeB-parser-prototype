@@ -36,11 +36,15 @@ class NameElement(BaseModel):
 
 
 class NameChange(BaseModel):
+    """One aligned before/after region across a CHNT boundary (REQ03
+    sections 25/30). old/new are lists to cover both shapes: a plain
+    rename is len(old) == len(new) == 1; a group split (e.g. "2MILLER"
+    -> "1MILLER/DMR 1GREEN/ZMR") is len(old) == 1, len(new) > 1."""
     model_config = ConfigDict(frozen=True)
 
     raw: str
-    old: NameElement
-    new: NameElement
+    old: list[NameElement]
+    new: list[NameElement]
 
 
 class SegmentElement(BaseModel):
@@ -101,6 +105,12 @@ class RecapSingleDateLine(BaseModel):
 
 
 class NameReference(BaseModel):
+    """A reference to a single already-declared passenger, as embedded
+    within an SSR or OSI line. surname is None when the reference token
+    has no slash and no surname of its own (e.g. an infant referenced
+    by given name + title only, inheriting the adult's surname from a
+    shared-surname NAME group) -- cross_reference_passengers falls back
+    to matching on (given_name, title) alone in that case."""
     model_config = ConfigDict(frozen=True, str_strip_whitespace=True, str_to_upper=True)
 
     raw: str

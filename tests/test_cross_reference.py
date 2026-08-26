@@ -148,7 +148,7 @@ def test_ssr_foid_with_no_name_is_skipped_not_an_error():
 
 
 def test_group_placeholder_contributes_no_passengers():
-    names = [parse_name_element("6SEAMEN"), parse_name_element("1RED/PETER")]
+    names = [parse_name_element("9SEAMEN"), parse_name_element("1RED/PETER")]
     passengers = cross_reference_passengers(names, [])
     assert len(passengers) == 1
     assert passengers[0].surname == "RED"
@@ -201,9 +201,9 @@ def test_validate_party_size_mismatch_returns_warning_not_error():
 
 
 def test_group_placeholder_contributes_to_party_size():
-    names = [parse_name_element("6SEAMEN")]
-    # 6SEAMEN legitimately represents 6 seats -- matches a 6-seat segment
-    assert validate_party_size(names, segment_number_in_party=6) == []
+    names = [parse_name_element("9SEAMEN")]
+    # 9SEAMEN legitimately represents 9 seats -- matches a 9-seat segment
+    assert validate_party_size(names, segment_number_in_party=9) == []
 
 
 def test_infant_via_shared_surname_title_suffix():
@@ -283,7 +283,7 @@ def test_real_dilaug_message_full_pipeline():
 
 def test_name_change_displays_old_name_by_default():
     old_passengers, changes = split_name_change_boundary(
-        ["1AAAAA/RMR", "CHNT", "1AAAAA/RMR 1BBBBB/SMR"]
+        ["1AAAAA/RMR", "CHNT", "1BBBBB/SMR"]
     )
     new_passengers = apply_name_changes(old_passengers, changes)
     result = cross_reference_passengers(new_passengers, [], changes)
@@ -294,7 +294,7 @@ def test_name_change_displays_old_name_by_default():
 
 def test_name_change_resolves_contact_data_against_old_name():
     old_passengers, changes = split_name_change_boundary(
-        ["1AAAAA/RMR", "CHNT", "1AAAAA/RMR 1BBBBB/SMR"]
+        ["1AAAAA/RMR", "CHNT", "1BBBBB/SMR"]
     )
     new_passengers = apply_name_changes(old_passengers, changes)
     contacts = [
@@ -313,7 +313,7 @@ def test_name_change_resolves_contact_data_against_new_name():
     # via apply_name_changes) so new-name references resolve directly;
     # name_changes then adds the old-name alias and old-name display.
     old_passengers, changes = split_name_change_boundary(
-        ["1AAAAA/RMR", "CHNT", "1AAAAA/RMR 1BBBBB/SMR"]
+        ["1AAAAA/RMR", "CHNT", "1BBBBB/SMR"]
     )
     new_passengers = apply_name_changes(old_passengers, changes)
     contacts = [
@@ -323,6 +323,18 @@ def test_name_change_resolves_contact_data_against_new_name():
     assert len(result) == 1
     assert result[0].surname == "AAAAA"
     assert result[0].ticket_numbers[0].ticket_number == "2051234567891C1"
+
+
+def test_name_change_split_displays_new_names_not_old():
+    # A split has no single old identity to fall back to -- resulting
+    # passengers display under their new names.
+    old_passengers, changes = split_name_change_boundary(
+        ["2MILLER/DMR/GMR", "CHNT", "1MILLER/DMR 1GREEN/GMR"]
+    )
+    new_passengers = apply_name_changes(old_passengers, changes)
+    result = cross_reference_passengers(new_passengers, [], changes)
+    surnames = {p.surname for p in result}
+    assert surnames == {"MILLER", "GREEN"}
 
 
 def test_no_name_changes_argument_behaves_as_before():

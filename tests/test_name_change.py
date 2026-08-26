@@ -1,37 +1,36 @@
 """
-End-to-end CHNT (name change) tests, corrected format (REQ03 sections
-25/30 as clarified by coworker): the full passenger list precedes
-CHNT, and each line after CHNT is an explicit "OLDNAME NEWNAME" pair --
-not two separate before/after blocks. This resolves the ambiguity the
-original before/after-block reading had with multiple passengers (see
-test_elements.py's split_name_change_boundary tests for the pairing
-logic itself).
+End-to-end CHNT (name change) tests, REQ03 sections 25/30 as
+clarified by Parka:
+  - single passenger: before/after each a single name (original spec
+    example shape)
+  - multiple passengers: the full list is rewritten after CHNT, same
+    order; only entries that actually change look different
+  - a group or named entry may split into multiple entries after CHNT
+  - entries with number_in_party < 9 require a title; >= 9 doesn't
+    (business rule -- see test_elements.py's Rule 4 tests)
 
-msg.passengers displays the OLD name for a renamed passenger's
-identity (surname/given_name/title) -- other data (tickets, FOID, DOB)
-still resolves normally regardless of whether a given SSR/OSI line on
-the wire references the old or the new name.
+msg.passengers displays the OLD name for a plain rename's identity
+(surname/given_name/title) -- other data (tickets, FOID, DOB) still
+resolves normally whether a given SSR/OSI line references the old or
+new name. A split has no single old identity, so its resulting
+passengers display under their new names (see test_cross_reference.py).
 
-Message 1 and 3 from the original 3-message batch are single-passenger
-cases and are corrected here to the new pairing shape. Message 2
-("2GREEN / CHNT / 1GREEN 1MILLER") was confirmed to be a different
-scenario (a group placeholder splitting into named individuals, not a
-name change) and isn't a CHNT fixture at all -- out of scope here.
+Unit tests for the alignment logic itself (_align_name_changes) live
+in test_elements.py.
 """
 from typeb.messages.booking import parse_booking_message
 
 
 def test_simple_name_swap_non_group():
-    # AAAAA/RMR -> BBBBB/SMR, corrected to the OLDNAME NEWNAME pairing
-    # shape. OSI TCP names not re-included, per the original message's
-    # own note.
+    # AAAAA/RMR -> BBBBB/SMR, original spec example shape. OSI TCP
+    # names not re-included, per the original message's own note.
     raw = """\
 QU CGKRMSJ
 .SINRM1B 102025
 SIN1B 318A15FEB
 1AAAAA/RMR
 CHNT
-1AAAAA/RMR 1BBBBB/SMR
+1BBBBB/SMR
 SJ326F15FEB CGKSIN HK1
 OSI SJ TCP3 1CCCCC/KMR 1DDDDD/ZMR
 NNNN"""
@@ -41,8 +40,8 @@ NNNN"""
     assert msg.is_name_change is True
     assert [ne.raw for ne in msg.name_elements] == ["1AAAAA/RMR"]
     assert len(msg.name_changes) == 1
-    assert msg.name_changes[0].old.raw == "1AAAAA/RMR"
-    assert msg.name_changes[0].new.raw == "1BBBBB/SMR"
+    assert [n.raw for n in msg.name_changes[0].old] == ["1AAAAA/RMR"]
+    assert [n.raw for n in msg.name_changes[0].new] == ["1BBBBB/SMR"]
 
     # passengers shows the OLD name as the identity
     assert len(msg.passengers) == 1
@@ -61,16 +60,16 @@ NNNN"""
 
 
 def test_name_change_retains_vgml_for_old_name():
-    # DDDDD/MRS -> YYYYY/MRS, corrected to the pairing shape. REQ03
-    # section 25 p.67: a special service tied to the changed name must
-    # be retained, not dropped, unless explicitly cancelled.
+    # DDDDD/MRS -> YYYYY/MRS. REQ03 section 25 p.67: a special service
+    # tied to the changed name must be retained, not dropped, unless
+    # explicitly cancelled.
     raw = """\
 QU JKTRMMZ
 .SINRM1B 101210
 SIN1B 11E231
 1DDDDD/MRS
 CHNT
-1DDDDD/MRS 1YYYYY/MRS
+1YYYYY/MRS
 MZ352Y20MAY ORDBRU HK1
 SSR VGML MZ XX1 ORDBRU0352Y20MAY-1DDDDD/MRS
 OSI MZ TCP4 1AAAAA/JMR 1BBBBB/BMR 1YYYYY/MRS
@@ -80,8 +79,8 @@ NNNN"""
 
     assert msg.is_name_change is True
     assert [ne.raw for ne in msg.name_elements] == ["1DDDDD/MRS"]
-    assert msg.name_changes[0].old.raw == "1DDDDD/MRS"
-    assert msg.name_changes[0].new.raw == "1YYYYY/MRS"
+    assert [n.raw for n in msg.name_changes[0].old] == ["1DDDDD/MRS"]
+    assert [n.raw for n in msg.name_changes[0].new] == ["1YYYYY/MRS"]
 
     # passengers shows the OLD name -- even though the SSR VGML line
     # (kept for retention) references the old name and OSI TCP
@@ -115,7 +114,7 @@ QU JKTRMMZ
 SIN1B 11E231
 1DDDDD/MRS
 CHNT
-1DDDDD/MRS 1YYYYY/MRS
+1YYYYY/MRS
 MZ352Y20MAY ORDBRU HK1
 SSR TKNE MZ ORDBRU0352Y20MAY-1YYYYY/MRS.2051234567890C1
 NNNN"""
@@ -129,18 +128,40 @@ NNNN"""
     assert msg.unrecognized_lines == []
 
 
-def test_two_passengers_change_names_unambiguously():
-    # The scenario the old before/after-block format couldn't express
-    # without guessing: two passengers in one booking both change
-    # names, explicitly paired -- no positional ambiguity.
+def test_multi_passenger_rewrite_only_changed_entry_reported():
+    # The full list is rewritten after CHNT -- DDDDD/DMR is unchanged
+    # and stays that way; only AAAAA/AMR -> ZZZZZ/ZMR is a change.
+    raw = """\
+QU CGKRMSJ
+.SINRM1B 102025
+SIN1B 318A15FEB
+1DDDDD/DMR 1AAAAA/AMR
+CHNT
+1DDDDD/DMR 1ZZZZZ/ZMR
+SJ326F15FEB CGKSIN HK2
+NNNN"""
+
+    msg = parse_booking_message(raw)
+
+    assert msg.is_name_change is True
+    assert len(msg.name_changes) == 1
+    assert [n.raw for n in msg.name_changes[0].old] == ["1AAAAA/AMR"]
+    assert [n.raw for n in msg.name_changes[0].new] == ["1ZZZZZ/ZMR"]
+
+    surnames = {p.surname for p in msg.passengers}
+    assert surnames == {"DDDDD", "AAAAA"}  # AAAAA is the old (displayed) name
+    assert msg.warnings == []
+    assert msg.unrecognized_lines == []
+
+
+def test_two_passengers_both_renamed_no_shared_anchor():
     raw = """\
 QU CGKRMSJ
 .SINRM1B 102025
 SIN1B 318A15FEB
 1AAAAA/RMR 1BBBBB/BMR
 CHNT
-1AAAAA/RMR 1CCCCC/CMR
-1BBBBB/BMR 1DDDDD/DMR
+1CCCCC/CMR 1DDDDD/DMR
 SJ326F15FEB CGKSIN HK2
 NNNN"""
 
@@ -148,20 +169,61 @@ NNNN"""
 
     assert msg.is_name_change is True
     assert len(msg.name_changes) == 2
-    assert (msg.name_changes[0].old.raw, msg.name_changes[0].new.raw) == (
-        "1AAAAA/RMR", "1CCCCC/CMR",
-    )
-    assert (msg.name_changes[1].old.raw, msg.name_changes[1].new.raw) == (
-        "1BBBBB/BMR", "1DDDDD/DMR",
-    )
 
-    # passengers shows the OLD names
-    assert len(msg.passengers) == 2
     surnames = {p.surname for p in msg.passengers}
     assert surnames == {"AAAAA", "BBBBB"}
-
     assert msg.warnings == []
     assert msg.unrecognized_lines == []
+
+
+def test_named_pair_splits_into_two_individuals():
+    # "2MILLER/DMR/GMR" -> "1MILLER/DMR 1GREEN/GMR": a shared-surname
+    # pair splitting into two separately-named passengers.
+    raw = """\
+QU CGKRMSJ
+.SINRM1B 102025
+SIN1B 318A15FEB
+2MILLER/DMR/GMR
+CHNT
+1MILLER/DMR 1GREEN/GMR
+SJ326F15FEB CGKSIN HK2
+NNNN"""
+
+    msg = parse_booking_message(raw)
+
+    assert msg.is_name_change is True
+    assert len(msg.name_changes) == 1
+    assert [n.raw for n in msg.name_changes[0].old] == ["2MILLER/DMR/GMR"]
+    assert [n.raw for n in msg.name_changes[0].new] == ["1MILLER/DMR", "1GREEN/GMR"]
+
+    # a split displays under the NEW names (no single old identity)
+    surnames = {p.surname for p in msg.passengers}
+    assert surnames == {"MILLER", "GREEN"}
+    assert msg.warnings == []
+    assert msg.unrecognized_lines == []
+
+
+def test_group_splits_into_two_smaller_groups():
+    # "30MILLER" -> "15MILLER 15GREEN": both >=9, so neither needs a
+    # title (business rule).
+    raw = """\
+QU CGKRMSJ
+.SINRM1B 102025
+SIN1B 318A15FEB
+30MILLER
+CHNT
+15MILLER 15GREEN
+SJ326F15FEB CGKSIN HK30
+NNNN"""
+
+    msg = parse_booking_message(raw)
+
+    assert msg.is_name_change is True
+    assert [n.raw for n in msg.name_changes[0].old] == ["30MILLER"]
+    assert [n.raw for n in msg.name_changes[0].new] == ["15MILLER", "15GREEN"]
+    # both are group placeholders -- no individual passenger records
+    assert msg.passengers == []
+    assert msg.warnings == []
 
 
 def test_no_chnt_means_no_name_change():
@@ -194,11 +256,11 @@ SIN1B 318A15FEB
 1AAAAA/RMR
 SJ326F15FEB CGKSIN HK1
 CHNT
-1AAAAA/RMR 1BBBBB/SMR
+1BBBBB/SMR
 NNNN"""
 
     msg = parse_booking_message(raw)
 
     assert msg.is_name_change is True
-    assert msg.name_changes[0].old.raw == "1AAAAA/RMR"
-    assert msg.name_changes[0].new.raw == "1BBBBB/SMR"
+    assert [n.raw for n in msg.name_changes[0].old] == ["1AAAAA/RMR"]
+    assert [n.raw for n in msg.name_changes[0].new] == ["1BBBBB/SMR"]

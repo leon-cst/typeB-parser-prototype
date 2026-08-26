@@ -10,27 +10,28 @@ from typeb.messages.booking import parse_booking_message
 # --------------------------------------------------------------------------
 
 def test_group_placeholder_counts_toward_party_size():
-    n = parse_name_element("6SEAMEN")
-    assert validate_party_size([n], 6) == []
+    n = parse_name_element("9SEAMEN")
+    assert validate_party_size([n], 9) == []
 
 
 def test_group_placeholder_mismatch_still_warns():
-    n = parse_name_element("6SEAMEN")
+    n = parse_name_element("9SEAMEN")
     warnings = validate_party_size([n], 5)
     assert len(warnings) == 1
-    assert "total party size of 6" in warnings[0]
+    assert "total party size of 9" in warnings[0]
 
 
 def test_surname_only_placeholders_sum_correctly():
     # REQ03 section 7's "party not yet individually named" shape --
-    # each of these is its own group placeholder; the total across all
-    # of them must count toward the segment's party size.
+    # each of these is its own group placeholder (>=9, per the
+    # no-title-below-9 rule); the total across all of them must count
+    # toward the segment's party size.
     elements = [
         parse_name_element(tok)
-        for tok in "5ARDMORE 3BATES 5DRUMMOND 3ENGLER 4HAYRES 5ZIMMERMAN 5CLARK".split()
+        for tok in "9ARDMORE 9BATES 9DRUMMOND 9ENGLER 9HAYRES 9ZIMMERMAN 9CLARK".split()
     ]
-    assert sum(e.number_in_party for e in elements) == 30
-    assert validate_party_size(elements, 30) == []
+    assert sum(e.number_in_party for e in elements) == 63
+    assert validate_party_size(elements, 63) == []
 
 
 # --------------------------------------------------------------------------
@@ -43,16 +44,16 @@ def test_warnings_deduplicated_across_segments():
 QU JFKRMTW
 .PARRMPA 051355
 PARPA 115Y10AUG
-5ARDMORE 3BATES 5DRUMMOND 3ENGLER 4HAYRES
-5ZIMMERMAN 5CLARK
-DL119Y10AUG ORYJFK HK30/1435 1700
-TW209Y11AUG JFKSTL NN30/1550 1720
-SSR GRPS TW TCP30 SITA/TOUR
+9ARDMORE 9BATES 9DRUMMOND 9ENGLER 9HAYRES
+9ZIMMERMAN 9CLARK
+DL119Y10AUG ORYJFK HK63/1435 1700
+TW209Y11AUG JFKSTL NN63/1550 1720
+SSR GRPS TW TCP63 SITA/TOUR
 SSR GRPF TW YNC
 SSR GRPF TW YNC PARNYCSTL FRF 3590
 OSI TW CTCA NYC HOLIDAY INN AGT ABC TRAVEL"""
     msg = parse_booking_message(raw)
-    # 30 declared across 7 groups matches both segments' 30 seats
+    # 63 declared across 7 groups matches both segments' 63 seats
     # exactly -- no warning should fire at all now that the count bug
     # is fixed, let alone fire twice.
     assert msg.warnings == []
@@ -88,18 +89,18 @@ def test_group_placeholders_field_surfaces_surname_only_groups():
 QU JFKRMTW
 .PARRMPA 051355
 PARPA 115Y10AUG
-5ARDMORE 3BATES 5DRUMMOND 3ENGLER 4HAYRES
-5ZIMMERMAN 5CLARK
-DL119Y10AUG ORYJFK HK30/1435 1700
-TW209Y11AUG JFKSTL NN30/1550 1720
-SSR GRPS TW TCP30 SITA/TOUR
+9ARDMORE 9BATES 9DRUMMOND 9ENGLER 9HAYRES
+9ZIMMERMAN 9CLARK
+DL119Y10AUG ORYJFK HK63/1435 1700
+TW209Y11AUG JFKSTL NN63/1550 1720
+SSR GRPS TW TCP63 SITA/TOUR
 SSR GRPF TW YNC
 SSR GRPF TW YNC PARNYCSTL FRF 3590
 OSI TW CTCA NYC HOLIDAY INN AGT ABC TRAVEL"""
     msg = parse_booking_message(raw)
     assert msg.passengers == []
     assert len(msg.group_placeholders) == 7
-    assert sum(g.number_in_party for g in msg.group_placeholders) == 30
+    assert sum(g.number_in_party for g in msg.group_placeholders) == 63
     assert {g.surname for g in msg.group_placeholders} == {
         "ARDMORE", "BATES", "DRUMMOND", "ENGLER", "HAYRES", "ZIMMERMAN", "CLARK",
     }

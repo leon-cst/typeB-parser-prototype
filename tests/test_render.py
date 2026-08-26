@@ -100,12 +100,12 @@ def test_render_name_distinct_surnames():
 
 def test_render_name_group_placeholder():
     n = NameElement(
-        raw="6SEAMEN",
-        number_in_party=6,
+        raw="9SEAMEN",
+        number_in_party=9,
         surname="SEAMEN",
         people=[],
         is_group_placeholder=True,
         seat_modifiers=[],
         uses_distinct_surnames=False,
     )
-    assert render_name_element(n) == "6SEAMEN"
+    assert render_name_element(n) == "9SEAMEN"

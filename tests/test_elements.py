@@ -373,12 +373,12 @@ def test_split_name_change_asymmetric_gap_raises():
 
 
 def test_split_name_change_no_names_before_chnt_raises():
-    with pytest.raises(ElementParseError, match="no NAME line before"):
+    with pytest.raises(ElementParseError, match="no usable NAME line before"):
         split_name_change_boundary(["CHNT", "1BBBBB/SMR"])
 
 
 def test_split_name_change_no_names_after_chnt_raises():
-    with pytest.raises(ElementParseError, match="no NAME line after"):
+    with pytest.raises(ElementParseError, match="no usable NAME line after"):
         split_name_change_boundary(["1AAAAA/RMR", "CHNT"])
 
 

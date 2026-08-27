@@ -264,3 +264,26 @@ NNNN"""
     assert msg.is_name_change is True
     assert [n.raw for n in msg.name_changes[0].old] == ["1AAAAA/RMR"]
     assert [n.raw for n in msg.name_changes[0].new] == ["1BBBBB/SMR"]
+
+
+def test_multi_person_rename_alongside_unrelated_passenger():
+    # Regression: two people sharing a surname both renamed within one
+    # multi-person entry, alongside an unrelated unchanged passenger --
+    # a prior bug collapsed both renamed people onto one identity.
+    raw = """\
+QU CGKRMSJ
+.SINRM1B 102025
+SIN1B 318A15FEB
+2KUSUMA/BUDIMR/FREDYMR 1FERNANDO/LEONARDOMR
+CHNT
+2ANGGARA/KEVINMR/DARRENMR 1FERNANDO/LEONARDOMR
+SJ326F15FEB CGKSIN HK3
+NNNN"""
+
+    msg = parse_booking_message(raw)
+
+    assert len(msg.passengers) == 3
+    given_names = sorted(p.given_name for p in msg.passengers if p.surname == "KUSUMA")
+    assert given_names == ["BUDI", "FREDY"]
+    assert msg.warnings == []
+    assert msg.unrecognized_lines == []

@@ -2,7 +2,11 @@ from __future__ import annotations
 
 from typeb.elements.cross_reference import cross_reference_passengers, validate_party_size
 from typeb.elements.errors import ElementParseError, UnrecognizedElementError
-from typeb.elements.name import apply_name_changes, split_name_change_boundary
+from typeb.elements.name import (
+    EXCLUDED_NAME_LINE_MARKER as _EXCLUDED_NAME_LINE_MARKER,
+    apply_name_changes,
+    split_name_change_boundary,
+)
 from typeb.elements.osi import parse_osi_line
 from typeb.elements.segment import parse_segment_element
 from typeb.elements.ssr import parse_ssr_line
@@ -39,7 +43,6 @@ def parse_booking_message(raw: str) -> BookingMessage:
 
     for kind, line in tokenize_body(body_lines):
         if len(line) > _DEFAULT_MAX_LINE_LENGTH:
-
             warnings.append(
                 f"Line excluded from parsing, {len(line)} characters "
                 f"exceeding the {_DEFAULT_MAX_LINE_LENGTH}-character "
@@ -52,6 +55,8 @@ def parse_booking_message(raw: str) -> BookingMessage:
                     reason=f"Line exceeds {_DEFAULT_MAX_LINE_LENGTH}-character limit",
                 )
             )
+            if kind == ElementKind.NAME:
+                name_lines.append(_EXCLUDED_NAME_LINE_MARKER)
             continue
 
         try:

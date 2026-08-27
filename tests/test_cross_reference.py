@@ -335,6 +335,32 @@ def test_name_change_split_displays_new_names_not_old():
     result = cross_reference_passengers(new_passengers, [], changes)
     surnames = {p.surname for p in result}
     assert surnames == {"MILLER", "GREEN"}
+    # regression: a prior bug cross-multiplied old/new people within a
+    # multi-person split, collapsing both resulting passengers onto
+    # one identity instead of keeping them distinct.
+    by_surname = {p.surname: p for p in result}
+    assert by_surname["MILLER"].given_name == "D"
+    assert by_surname["GREEN"].given_name == "G"
+
+
+def test_name_change_multi_person_rename_keeps_people_distinct():
+    # Regression: a prior bug paired every old person against every
+    # new person within a single multi-person rename (a 2x2
+    # cross-product instead of a 1:1 positional pairing), collapsing
+    # both renamed passengers onto the same displayed identity.
+    old_passengers, changes = split_name_change_boundary(
+        [
+            "2KUSUMA/BUDIMR/FREDYMR 1FERNANDO/LEONARDOMR",
+            "CHNT",
+            "2ANGGARA/KEVINMR/DARRENMR 1FERNANDO/LEONARDOMR",
+        ]
+    )
+    new_passengers = apply_name_changes(old_passengers, changes)
+    result = cross_reference_passengers(new_passengers, [], changes)
+
+    assert len(result) == 3
+    given_names = sorted(p.given_name for p in result if p.surname == "KUSUMA")
+    assert given_names == ["BUDI", "FREDY"]
 
 
 def test_no_name_changes_argument_behaves_as_before():

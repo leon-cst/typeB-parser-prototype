@@ -99,6 +99,21 @@ def cross_reference_passengers(
     if name_changes:
         for change in name_changes:
             is_plain_rename = len(change.old) == 1 and len(change.new) == 1
+            if is_plain_rename:
+                old_entry, new_entry = change.old[0], change.new[0]
+                if new_entry.is_group_placeholder or len(old_entry.people) != len(new_entry.people):
+                    continue
+                for old_person, new_person in zip(old_entry.people, new_entry.people):
+                    new_surname = new_person.surname if new_person.surname else new_entry.surname
+                    new_key = _passenger_key(new_surname, new_person.given_name, new_person.title)
+                    if new_key not in pool:
+                        continue
+                    old_surname = old_person.surname if old_person.surname else old_entry.surname
+                    old_key = _passenger_key(old_surname, old_person.given_name, old_person.title)
+                    pool[old_key] = pool[new_key]
+                    old_name_keys[new_key] = old_key
+                continue
+
             for new_entry in change.new:
                 if new_entry.is_group_placeholder:
                     continue
@@ -106,23 +121,6 @@ def cross_reference_passengers(
                     new_surname = person.surname if person.surname else new_entry.surname
                     new_key = _passenger_key(new_surname, person.given_name, person.title)
                     if new_key not in pool:
-                        continue
-                    if not is_plain_rename:
-                        # A split's resulting passengers have no single
-                        # old identity to fall back to -- they display
-                        # under their new names, but the old aggregate
-                        # name should still resolve any wire reference
-                        # that still uses it (e.g. an SSR issued before
-                        # the split).
-                        for old_entry in change.old:
-                            for old_person in old_entry.people:
-                                old_surname = (
-                                    old_person.surname if old_person.surname else old_entry.surname
-                                )
-                                old_key = _passenger_key(
-                                    old_surname, old_person.given_name, old_person.title
-                                )
-                                pool.setdefault(old_key, pool[new_key])
                         continue
                     for old_entry in change.old:
                         for old_person in old_entry.people:
@@ -132,8 +130,7 @@ def cross_reference_passengers(
                             old_key = _passenger_key(
                                 old_surname, old_person.given_name, old_person.title
                             )
-                            pool[old_key] = pool[new_key]
-                            old_name_keys[new_key] = old_key
+                            pool.setdefault(old_key, pool[new_key])
 
     for element in contact_elements:
         if isinstance(element, AutomatedSsrElement):

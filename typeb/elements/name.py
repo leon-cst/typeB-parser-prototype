@@ -10,6 +10,11 @@ _LEADING_DIGITS_RE = re.compile(r"^(\d{1,3})(.*)$")
 _OPTIONAL_LEADING_DIGITS_RE = re.compile(r"^(\d{1,3})?(.*)$")
 _SEAT_MODIFIER_KEYWORDS = {"EXST", "CBBG"}
 _CHNT_MARKER = "CHNT"  # sentinel used by split_name_change_boundary()
+EXCLUDED_NAME_LINE_MARKER = "\0EXCLUDED_NAME_LINE\0"  # sentinel a caller
+# (typeb.messages.booking) substitutes for a NAME-kind line it excluded
+# for exceeding the 69-character limit -- lets split_name_change_boundary
+# report "a NAME line was here but excluded" instead of a misleading
+# "no NAME line here at all".
 
 
 def _known_titles_longest_first() -> list[str]:
@@ -303,9 +308,12 @@ def _align_name_changes(
 def split_name_change_boundary(
     name_lines: list[str],
 ) -> tuple[list[NameElement], list[NameChange]]:
-
     if _CHNT_MARKER not in name_lines:
-        return [g for line in name_lines for g in parse_name_line(line)], []
+        return [
+            g for line in name_lines
+            if line != EXCLUDED_NAME_LINE_MARKER
+            for g in parse_name_line(line)
+        ], []
 
     if name_lines.count(_CHNT_MARKER) > 1:
         raise ElementParseError(
@@ -316,23 +324,33 @@ def split_name_change_boundary(
     boundary = name_lines.index(_CHNT_MARKER)
     before_lines, after_lines = name_lines[:boundary], name_lines[boundary + 1:]
 
-    if not before_lines:
-        raise ElementParseError(
-            "CHNT appeared with no NAME line before it -- REQ03 section "
-            "25/30 requires the full passenger list to precede CHNT."
-        )
-    if not after_lines:
-        raise ElementParseError(
-            "CHNT appeared with no NAME line after it -- REQ03 section "
-            "25/30 requires the full, rewritten passenger list to "
-            "follow CHNT."
-        )
+    before_excluded = before_lines.count(EXCLUDED_NAME_LINE_MARKER)
+    after_excluded = after_lines.count(EXCLUDED_NAME_LINE_MARKER)
+    before_usable = [l for l in before_lines if l != EXCLUDED_NAME_LINE_MARKER]
+    after_usable = [l for l in after_lines if l != EXCLUDED_NAME_LINE_MARKER]
 
-    passengers = [g for line in before_lines for g in parse_name_line(line)]
-    after_passengers = [g for line in after_lines for g in parse_name_line(line)]
+    if not before_usable:
+        reason = (
+            f"a NAME line was there but excluded for exceeding the "
+            f"69-character limit (see warnings)"
+            if before_excluded else "REQ03 section 25/30 requires the "
+            "full passenger list to precede CHNT"
+        )
+        raise ElementParseError(f"CHNT appeared with no usable NAME line before it -- {reason}.")
+    if not after_usable:
+        reason = (
+            f"a NAME line was there but excluded for exceeding the "
+            f"69-character limit (see warnings)"
+            if after_excluded else "REQ03 section 25/30 requires the "
+            "full, rewritten passenger list to follow CHNT"
+        )
+        raise ElementParseError(f"CHNT appeared with no usable NAME line after it -- {reason}.")
+
+    passengers = [g for line in before_usable for g in parse_name_line(line)]
+    after_passengers = [g for line in after_usable for g in parse_name_line(line)]
 
     name_changes = _align_name_changes(
-        passengers, after_passengers, " ".join(before_lines), " ".join(after_lines)
+        passengers, after_passengers, " ".join(before_usable), " ".join(after_usable)
     )
 
     return passengers, name_changes

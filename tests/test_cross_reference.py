@@ -14,6 +14,7 @@ from typeb.elements.cross_reference import (
     cross_reference_passengers,
     validate_party_size,
 )
+from typeb.elements.errors import ElementParseError
 from typeb.elements.name import (
     apply_name_changes,
     parse_name_element,
@@ -186,24 +187,21 @@ def test_automated_ssr_referencing_an_absent_name_does_not_crash():
 # validate_party_size
 # --------------------------------------------------------------------------
 
-def test_validate_party_size_matching_returns_no_warnings():
+def test_validate_party_size_matching_does_not_raise():
     names = [parse_name_element("2FORD/E/B")]
-    warnings = validate_party_size(names, segment_number_in_party=2)
-    assert warnings == []
+    validate_party_size(names, segment_number_in_party=2)
 
 
-def test_validate_party_size_mismatch_returns_warning_not_error():
+def test_validate_party_size_mismatch_raises():
     names = [parse_name_element("2FORD/E/B")]
-    warnings = validate_party_size(names, segment_number_in_party=1)
-    assert len(warnings) == 1
-    assert "total party size of 2" in warnings[0]
-    assert "requests 1 seat" in warnings[0]
+    with pytest.raises(ElementParseError, match="total party size of 2.*requests 1 seat"):
+        validate_party_size(names, segment_number_in_party=1)
 
 
 def test_group_placeholder_contributes_to_party_size():
     names = [parse_name_element("9SEAMEN")]
     # 9SEAMEN legitimately represents 9 seats -- matches a 9-seat segment
-    assert validate_party_size(names, segment_number_in_party=9) == []
+    validate_party_size(names, segment_number_in_party=9)  # doesn't raise
 
 
 def test_infant_via_shared_surname_title_suffix():

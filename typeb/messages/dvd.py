@@ -96,9 +96,7 @@ def parse_dvd_message(raw: str) -> DvdMessage:
     ]
 
     for segment in segments:
-        for warning in validate_party_size(name_elements, segment.number_in_party):
-            if warning not in warnings:
-                warnings.append(warning)
+        validate_party_size(name_elements, segment.number_in_party)
 
     return DvdMessage(
         envelope=envelope,

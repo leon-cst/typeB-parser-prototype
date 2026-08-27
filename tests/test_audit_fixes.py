@@ -1,4 +1,7 @@
+import pytest
+
 from typeb.elements.cross_reference import validate_party_size
+from typeb.elements.errors import ElementParseError
 from typeb.elements.name import parse_name_element
 from typeb.elements.ssr import parse_ssr_line
 from typeb.messages.booking import parse_booking_message
@@ -11,14 +14,13 @@ from typeb.messages.booking import parse_booking_message
 
 def test_group_placeholder_counts_toward_party_size():
     n = parse_name_element("9SEAMEN")
-    assert validate_party_size([n], 9) == []
+    validate_party_size([n], 9)  # doesn't raise
 
 
-def test_group_placeholder_mismatch_still_warns():
+def test_group_placeholder_mismatch_raises():
     n = parse_name_element("9SEAMEN")
-    warnings = validate_party_size([n], 5)
-    assert len(warnings) == 1
-    assert "total party size of 9" in warnings[0]
+    with pytest.raises(ElementParseError, match="total party size of 9"):
+        validate_party_size([n], 5)
 
 
 def test_surname_only_placeholders_sum_correctly():
@@ -31,7 +33,7 @@ def test_surname_only_placeholders_sum_correctly():
         for tok in "9ARDMORE 9BATES 9DRUMMOND 9ENGLER 9HAYRES 9ZIMMERMAN 9CLARK".split()
     ]
     assert sum(e.number_in_party for e in elements) == 63
-    assert validate_party_size(elements, 63) == []
+    validate_party_size(elements, 63)  # doesn't raise
 
 
 # --------------------------------------------------------------------------

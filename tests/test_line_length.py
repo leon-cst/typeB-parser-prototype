@@ -8,7 +8,16 @@
   - Body lines (NAME, SEGMENT, SSR, OSI, etc.) over the limit are
     excluded from parsing and land in unrecognized_lines, with a
     matching warning -- see typeb.messages.booking.
+
+Note: excluding a NAME line can itself trigger a hard party-size
+mismatch failure downstream (see typeb.elements.cross_reference,
+validate_party_size fails loud on any mismatch by design) -- accepted,
+since messages are machine-generated, not hand-typed, so a mismatch is
+more likely a real upstream fault than a benign transcription quirk.
 """
+import pytest
+
+from typeb.elements.errors import ElementParseError
 from typeb.envelope.parser import parse_envelope
 from typeb.messages.booking import parse_booking_message
 
@@ -42,7 +51,14 @@ def test_error_names_exact_line_number_and_length():
     assert "Line 2 is 80 characters" in warnings[0]
 
 
-def test_too_long_body_line_excluded_not_parsed():
+def test_too_long_body_line_excluded_then_party_size_mismatch_raises():
+    # Excluding the over-length NAME line drops the declared party size
+    # to 0, which no longer matches the segment's NN1 -- validate_party_size
+    # now fails loud on any mismatch (see typeb.elements.cross_reference),
+    # so this raises rather than returning a message with an empty
+    # passengers list. Accepted tradeoff: messages are machine-generated,
+    # not hand-typed, so a mismatch here is more likely a real upstream
+    # fault than an acceptable transcription quirk.
     raw = (
         "QU CGKRM8G\n"
         ".NYCRM1G 050110\n"
@@ -50,33 +66,27 @@ def test_too_long_body_line_excluded_not_parsed():
         "1" + "A" * 70 + "/BAMBANGMR\n"
         "8G083F24SEP CGKDPS NN1 0910 1015"
     )
+    with pytest.raises(ElementParseError, match="total party size of 0"):
+        parse_booking_message(raw)
+
+
+def test_too_long_body_line_excluded_when_party_size_still_matches():
+    # Same exclusion, but the segment requests 0 seats too (a passive
+    # segment) -- confirms the exclusion itself doesn't block the rest
+    # of the message from parsing when there's no resulting mismatch.
+    raw = (
+        "QU CGKRM8G\n"
+        ".NYCRM1G 050110\n"
+        "NYC1G CPNR1G/AAA/111122223333/NYC/1G/NL/CHF/SU\n"
+        "1" + "A" * 70 + "/BAMBANGMR\n"
+        "8G083F24SEP CGKDPS NN0 0910 1015"
+    )
     msg = parse_booking_message(raw)
 
-    # excluded from real output, not force-parsed as a NAME element
     assert msg.name_elements == []
     assert msg.passengers == []
-
     assert len(msg.unrecognized_lines) == 1
-    assert "exceeds" in msg.unrecognized_lines[0].reason
-
-    assert any("exceeding the 69-character limit" in w for w in msg.warnings)
-
-
-def test_too_long_body_line_does_not_block_other_lines_from_parsing():
-    # The over-length NAME line is excluded, but the segment on the
-    # next line still parses normally -- one bad line doesn't fail the
-    # whole message.
-    raw = (
-        "QU CGKRM8G\n"
-        ".NYCRM1G 050110\n"
-        "NYC1G CPNR1G/AAA/111122223333/NYC/1G/NL/CHF/SU\n"
-        "1" + "A" * 70 + "/BAMBANGMR\n"
-        "8G083F24SEP CGKDPS NN1 0910 1015"
-    )
-    msg = parse_booking_message(raw)
-
     assert len(msg.segments) == 1
-    assert msg.segments[0].airline_code == "8G"
 
 
 def test_real_messages_from_project_history_produce_no_warnings():

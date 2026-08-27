@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Union
 
+from typeb.elements.errors import ElementParseError
 from typeb.model.elements import (
     AutomatedSsrElement,
     DobElement,
@@ -41,19 +42,6 @@ def cross_reference_passengers(
     contact_elements: list[ContactElement],
     name_changes: list[NameChange] | None = None,
 ) -> list[BookingPassenger]:
-    """name_elements must be the POST-CHNT passenger list (each renamed
-    passenger's NEW name) -- e.g. via typeb.elements.name.apply_name_changes.
-    Passing the pre-CHNT list here silently breaks resolution of any
-    SSR/OSI line that references a passenger's new name.
-
-    When name_changes is given: each old name is aliased to the same
-    pool entry(ies) as its replacement, so a line referencing either
-    the old or the new name resolves correctly. For a plain rename
-    (one old name, one new name) the final BookingPassenger's identity
-    fields are overridden back to the old name for display. A split
-    (one old name, several new names) has no single old identity to
-    fall back to for each resulting passenger, so those display under
-    their new names."""
     pool: dict[PassengerKey, dict] = {}
     order: list[PassengerKey] = []
 
@@ -90,11 +78,7 @@ def cross_reference_passengers(
             }
             order.append(key)
 
-    # Alias each CHNT change's old name(s) to the same pool record(s)
-    # as the new name(s), so an SSR/OSI line referencing either the old
-    # or the new name resolves -- without this, a line still pointing
-    # at the old name (e.g. cancelling a service tied to it) would
-    # fail to match, since name_elements only carries the new names.
+
     old_name_keys: dict[PassengerKey, PassengerKey] = {}
     if name_changes:
         for change in name_changes:
@@ -134,30 +118,15 @@ def cross_reference_passengers(
 
     for element in contact_elements:
         if isinstance(element, AutomatedSsrElement):
-            # VGML/SMSW/etc. may reference a passenger who is being
-            # cancelled or replaced in this same message (e.g. a name
-            # change dropping a special-service request tied to the
-            # old name) -- not an error, and not this layer's job to
-            # resolve. Captured by the caller via contact_elements;
-            # nothing to attach to a BookingPassenger record.
             continue
 
         name_ref = getattr(element, "name", None)
         if name_ref is None:
             continue
         if isinstance(name_ref, NameElement):
-            # A multi-person shared-surname reference (REQ03 section 16
-            # group SSRs, e.g. "-5ARDMORE/BOB/SUE/TIM/TOM/TONY") refers
-            # to several passengers at once, not one -- there's no
-            # single BookingPassenger record to attach this to, so it's
-            # left out of cross-referencing rather than guessing which
-            # one person it means.
             continue
 
         if name_ref.surname is None:
-            # No surname on the reference itself (e.g. an infant given
-            # only as "1BAYIBUDIINF") -- fall back to matching on
-            # (given_name, title) alone, but only if that's unambiguous.
             candidates = [
                 k for k in pool
                 if k[1] == name_ref.given_name and k[2] == name_ref.title
@@ -269,18 +238,11 @@ def _set_passenger_type(record: dict, new_type: str, element: ContactElement) ->
 
 def validate_party_size(
     name_elements: list[NameElement], segment_number_in_party: int
-) -> list[str]:
-    # Every NAME element's number_in_party counts toward the total,
-    # whether or not individual names are known -- a group placeholder
-    # like "6SEAMEN" or a surname-only entry like "5ARDMORE" still
-    # represents that many real seats.
+) -> None:
     total_name_party = sum(ne.number_in_party for ne in name_elements)
     if total_name_party != segment_number_in_party:
-        return [
+        raise ElementParseError(
             f"NAME elements declare a total party size of "
             f"{total_name_party}, but the segment requests "
-            f"{segment_number_in_party} seat(s). This can be legitimate "
-            f"(REQ03 p.11: infant inclusion in number_in_party is "
-            f"bilateral-agreement-dependent) but is worth a human check."
-        ]
-    return []
+            f"{segment_number_in_party} seat(s)."
+        )

@@ -137,9 +137,7 @@ def parse_booking_message(raw: str) -> BookingMessage:
     automated_ssrs = [e for e in contact_elements if isinstance(e, AutomatedSsrElement)]
 
     for segment in segments:
-        for warning in validate_party_size(current_name_elements, segment.number_in_party):
-            if warning not in warnings:
-                warnings.append(warning)
+        validate_party_size(current_name_elements, segment.number_in_party)
 
     return BookingMessage(
         envelope=envelope,

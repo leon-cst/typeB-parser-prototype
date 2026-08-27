@@ -154,10 +154,10 @@ NYC1G CPNR1G/AAA/111122223333/NYC/1G/NL/CHF/SU
     assert msg.warnings == []  # party size 2 == segment's NN2, matches
 
 
-def test_party_size_mismatch_produces_warning_not_failure():
-    # NAME declares 1 person, SEGMENT requests 2 seats -- REQ03's
-    # invariant doesn't hold, but this is a warning per policy (could be
-    # legitimate infant-inclusion variance), not a hard failure.
+def test_party_size_mismatch_raises():
+    # NAME declares 1 person, SEGMENT requests 2 seats -- fails loud by
+    # design decision (was previously a warning to allow for
+    # infant-inclusion variance; that exception is no longer honored).
     raw = """\
 QU CGKRM8G
 .NYCRM1G 050110
@@ -165,11 +165,8 @@ NYC1G CPNR1G/AAA/111122223333/NYC/1G/NL/CHF/SU
 1RAHARJO/BAMBANGMR
 8G083F24SEP CGKDPS NN2 0910 1015"""
 
-    msg = parse_booking_message(raw)
-
-    assert len(msg.warnings) == 1
-    assert "total party size of 1" in msg.warnings[0]
-    assert "requests 2 seat" in msg.warnings[0]
+    with pytest.raises(ElementParseError, match="total party size of 1"):
+        parse_booking_message(raw)
 
 
 def test_non_booking_message_raises_clearly():

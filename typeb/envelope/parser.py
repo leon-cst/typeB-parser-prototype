@@ -137,7 +137,8 @@ def parse_envelope(raw_message: str) -> tuple[Envelope, list[str], list[str]]:
         ):
             record_locator_raw_lines.append(_consume(idx).strip())
             idx += 1
-        if not record_locator_raw_lines:
+
+        if not record_locator_raw_lines and message_identifier != "DVD":
             got = lines[idx] if idx < len(lines) else "<end of message>"
             after = (
                 f"identifier {message_identifier!r}"

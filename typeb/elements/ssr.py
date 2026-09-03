@@ -23,6 +23,31 @@ _NON_AUTOMATED_RE = re.compile(
 )
 
 _ACTION_COUNT_RE = re.compile(r"^(?P<action>[A-Z]{2})(?P<count>\d{1,3})$")
+_GLUED_ACTION_COUNT_RE = re.compile(r"^(?P<action>[A-Z]{2})(?P<count>\d{1,3})(?P<rest>[A-Z0-9].*)$")
+
+
+def _match_action_count(token: str, next_tokens: list[str]) -> tuple[str, int, str, bool] | None:
+    """Matches a leading '<action><count>' at the start of `token`,
+    space-separated from what follows (REQ03's own examples) or fully
+    glued onto it (real message traffic, e.g. "NN1ORDPIT0122F15FEB").
+    Returns (action, count, remainder, is_glued) -- remainder is
+    everything after action+count (token's own glued tail plus
+    next_tokens, space-joined) -- or None if token doesn't start with
+    an action+count at all. is_glued distinguishes a glued match
+    (where the segment reference is packed into the same token, so no
+    further tokens are required) from a plain space-separated one."""
+    m = _ACTION_COUNT_RE.match(token)
+    if m:
+        return m.group("action"), int(m.group("count")), " ".join(next_tokens), False
+    m = _GLUED_ACTION_COUNT_RE.match(token)
+    if m:
+        return (
+            m.group("action"),
+            int(m.group("count")),
+            " ".join([m.group("rest")] + next_tokens),
+            True,
+        )
+    return None
 
 
 def _parse_name_token_flexibly(name_token: str): # for SSR lines ending with "-"
@@ -92,13 +117,16 @@ def _split_automated_ssr(
     rest = tokens[3:]
 
     action_code = number_in_party = None
-    m = _ACTION_COUNT_RE.match(rest[0])
-    if m and len(rest) > 1:
-        action_code = m.group("action")
-        number_in_party = int(m.group("count"))
-        rest = rest[1:]
-
-    remainder = " ".join(rest)
+    matched = _match_action_count(rest[0], rest[1:])
+    if matched:
+        matched_action, matched_count, matched_remainder, is_glued = matched
+        if is_glued or len(rest) > 1:
+            action_code, number_in_party = matched_action, matched_count
+            remainder = matched_remainder
+        else:
+            remainder = " ".join(rest)
+    else:
+        remainder = " ".join(rest)
 
     if "." in remainder:
         left, trailing_text = remainder.rsplit(".", 1)
@@ -192,16 +220,12 @@ def _parse_ssr_gpst(line: str, tokens: list[str]) -> SsrGroupSeatElement:
     # section 16's "NN30 JFKSTL0209Y11AUG" example) or fully glued onto
     # it (real message traffic: "NN25JFKSTL0209Y11AUG") -- same
     # glued-vs-spaced bilateral variance already handled for SEGMENT.
-    m = _ACTION_COUNT_RE.match(tokens[3])
-    if m:
-        segment_reference_raw = " ".join(tokens[4:])
-    else:
-        m = re.match(r"^(?P<action>[A-Z]{2})(?P<count>\d{1,3})(?P<rest>[A-Z0-9].*)$", tokens[3])
-        if not m:
-            raise ElementParseError(
-                f"SSR GPST's action+count token malformed: {tokens[3]!r} in {line!r}"
-            )
-        segment_reference_raw = " ".join([m.group("rest")] + tokens[4:])
+    matched = _match_action_count(tokens[3], tokens[4:])
+    if not matched:
+        raise ElementParseError(
+            f"SSR GPST's action+count token malformed: {tokens[3]!r} in {line!r}"
+        )
+    action_code, number_in_party, segment_reference_raw, _is_glued = matched
 
     if not segment_reference_raw:
         raise ElementParseError(
@@ -210,8 +234,8 @@ def _parse_ssr_gpst(line: str, tokens: list[str]) -> SsrGroupSeatElement:
     return SsrGroupSeatElement(
         raw=line.strip(),
         airline_code=tokens[2],
-        action_code=m.group("action"),
-        number_in_party=int(m.group("count")),
+        action_code=action_code,
+        number_in_party=number_in_party,
         segment_reference_raw=segment_reference_raw,
     )
 
@@ -283,7 +307,7 @@ def _parse_ssr_automated_generic(line: str, tokens: list[str]) -> AutomatedSsrEl
     )
 
 
-_AUTOMATED_FORMAT_CODES = {"LSML", "NSST", "SMSW", "VGML", "BSCT", "OTHS"}
+_AUTOMATED_FORMAT_CODES = {"LSML", "NSST", "SMSW", "VGML", "BSCT", "OTHS", "WCHR"}
 
 
 _SSR_HANDLERS = {

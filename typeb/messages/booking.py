@@ -1,19 +1,10 @@
 from __future__ import annotations
 
 from typeb.elements.cross_reference import cross_reference_passengers, validate_party_size
-from typeb.elements.errors import ElementParseError, UnrecognizedElementError
-from typeb.elements.name import (
-    EXCLUDED_NAME_LINE_MARKER as _EXCLUDED_NAME_LINE_MARKER,
-    apply_name_changes,
-    split_name_change_boundary,
-)
-from typeb.elements.osi import parse_osi_line
-from typeb.elements.segment import parse_segment_element
-from typeb.elements.ssr import parse_ssr_line
-from typeb.elements.tokenizer import ElementKind, tokenize_body
-from typeb.envelope.parser import _DEFAULT_MAX_LINE_LENGTH, parse_envelope
+from typeb.elements.errors import ElementParseError
+from typeb.envelope.parser import parse_envelope
+from typeb.messages._shared_body import parse_shared_body
 from typeb.model.booking import BookingMessage, GroupPlaceholder
-from typeb.model.common import UnrecognizedLine
 from typeb.model.elements import (
     AutomatedSsrElement,
     OsiContactAddressElement,
@@ -36,73 +27,18 @@ def parse_booking_message(raw: str) -> BookingMessage:
             f"(identifier={envelope.effective_identifier!r})."
         )
 
-    name_lines: list[str] = []  # NAME lines, with "CHNT" as a sentinel
-    segments: list[SegmentElement] = []
-    contact_elements: list = []
-    unrecognized: list[UnrecognizedLine] = []
-
-    for kind, line in tokenize_body(body_lines):
-        if len(line) > _DEFAULT_MAX_LINE_LENGTH:
-            warnings.append(
-                f"Line excluded from parsing, {len(line)} characters "
-                f"exceeding the {_DEFAULT_MAX_LINE_LENGTH}-character "
-                f"limit (REQ03 section 3): {line!r}"
-            )
-            unrecognized.append(
-                UnrecognizedLine(
-                    raw=line,
-                    tokenizer_kind=kind.value,
-                    reason=f"Line exceeds {_DEFAULT_MAX_LINE_LENGTH}-character limit",
-                )
-            )
-            if kind == ElementKind.NAME:
-                name_lines.append(_EXCLUDED_NAME_LINE_MARKER)
-            continue
-
-        try:
-            if kind in (ElementKind.NAME, ElementKind.CHNT):
-                name_lines.append(line)
-            elif kind == ElementKind.SEGMENT:
-                segments.append(parse_segment_element(line))
-            elif kind == ElementKind.SSR:
-                contact_elements.append(parse_ssr_line(line))
-            elif kind == ElementKind.OSI:
-                contact_elements.append(parse_osi_line(line))
-            elif kind == ElementKind.MARKER:
-                continue
-            elif kind in (ElementKind.AVAILABILITY_LINE, ElementKind.RECAP_LINE):
-                raise ElementParseError(
-                    f"Unexpected {kind.value} shape inside a booking "
-                    f"message body: {line!r}"
-                )
-            else:
-                unrecognized.append(
-                    UnrecognizedLine(
-                        raw=line,
-                        tokenizer_kind=kind.value,
-                        reason="Line did not match any known element shape",
-                    )
-                )
-        except UnrecognizedElementError as e:
-            unrecognized.append(
-                UnrecognizedLine(raw=line, tokenizer_kind=kind.value, reason=str(e))
-            )
-
-    name_elements, name_changes = split_name_change_boundary(name_lines)
+    body = parse_shared_body(body_lines, warnings)
 
     # No reliable wire-level signal distinguishes ARRIVAL from SEGMENT
     # lines, so this stays empty until a real signal is found.
     arrival_elements: list[SegmentElement] = []
 
-
-    current_name_elements = apply_name_changes(name_elements, name_changes)
-
     passengers = cross_reference_passengers(
-        current_name_elements, contact_elements, name_changes
+        body.current_name_elements, body.contact_elements, body.name_changes
     )
 
     grps_by_group_name: dict[str, int] = {}
-    for e in contact_elements:
+    for e in body.contact_elements:
         if not isinstance(e, SsrGroupElement) or not e.group_name:
             continue
         digits = "".join(c for c in e.structured_text if c.isdigit())
@@ -110,7 +46,7 @@ def parse_booking_message(raw: str) -> BookingMessage:
             grps_by_group_name[e.group_name] = int(digits)
 
     group_placeholders = []
-    for ne in current_name_elements:
+    for ne in body.current_name_elements:
         if not ne.is_group_placeholder:
             continue
         group_name = ne.surname + (
@@ -127,32 +63,32 @@ def parse_booking_message(raw: str) -> BookingMessage:
 
     airline_record_locators = [
         e.record_locator
-        for e in contact_elements
+        for e in body.contact_elements
         if isinstance(e, (SsrRecordLocatorElement, OsiRecordLocatorElement))
     ]
-    group_fare_info = [e for e in contact_elements if isinstance(e, SsrGroupFareElement)]
-    group_seat_requests = [e for e in contact_elements if isinstance(e, SsrGroupSeatElement)]
-    contact_addresses = [e for e in contact_elements if isinstance(e, OsiContactAddressElement)]
-    party_count_notices = [e for e in contact_elements if isinstance(e, OsiPartyCountElement)]
-    automated_ssrs = [e for e in contact_elements if isinstance(e, AutomatedSsrElement)]
+    group_fare_info = [e for e in body.contact_elements if isinstance(e, SsrGroupFareElement)]
+    group_seat_requests = [e for e in body.contact_elements if isinstance(e, SsrGroupSeatElement)]
+    contact_addresses = [e for e in body.contact_elements if isinstance(e, OsiContactAddressElement)]
+    party_count_notices = [e for e in body.contact_elements if isinstance(e, OsiPartyCountElement)]
+    automated_ssrs = [e for e in body.contact_elements if isinstance(e, AutomatedSsrElement)]
 
-    for segment in segments:
-        validate_party_size(current_name_elements, segment.number_in_party)
+    for segment in body.segments:
+        validate_party_size(body.current_name_elements, segment.number_in_party)
 
     return BookingMessage(
         envelope=envelope,
         passengers=passengers,
-        name_elements=name_elements,
-        name_changes=name_changes,
+        name_elements=body.name_elements,
+        name_changes=body.name_changes,
         group_placeholders=group_placeholders,
         arrival_elements=arrival_elements,
-        segments=segments,
+        segments=body.segments,
         airline_record_locators=airline_record_locators,
         group_fare_info=group_fare_info,
         group_seat_requests=group_seat_requests,
         contact_addresses=contact_addresses,
         party_count_notices=party_count_notices,
         automated_ssrs=automated_ssrs,
-        warnings=warnings,
-        unrecognized_lines=unrecognized,
+        warnings=body.warnings,
+        unrecognized_lines=body.unrecognized_lines,
     )

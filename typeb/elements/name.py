@@ -107,7 +107,7 @@ def parse_name_element(line: str) -> NameElement:
         )
 
     if "/" not in rest:
-        if number_in_party < 9:
+        if number_in_party < 9: # MINIMUM GROUP PARTY NUMBER 
             raise ElementParseError(
                 f"NAME group with no '/' and number_in_party={number_in_party} "
                 f"< 9 requires a title -- only 9 or more is treated as a "

@@ -47,12 +47,8 @@ def _parse_osi_passenger_type_flag(line: str, tokens: list[str]):
 
 
 def _parse_osi_record_locator(line: str, tokens: list[str]):
-    # REQ03 section 17: "OSI NH RLOC NH CPNRNH" (5 tokens, airline repeated)
-    if len(tokens) != 5:
-        raise ElementParseError(
-            f"OSI RLOC line expected exactly 5 tokens ('OSI', airline, "
-            f"'RLOC', airline, record locator), got {len(tokens)}: {line!r}"
-        )
+    # REQ03 section 17: "OSI NH RLOC NH CPNRNH" -- airline code repeated
+    # (always 2 characters), space-separated from the record locator.
     return OsiRecordLocatorElement(
         raw=line.strip(),
         airline_code=tokens[1],
@@ -61,17 +57,11 @@ def _parse_osi_record_locator(line: str, tokens: list[str]):
     )
 
 
-def _parse_osi_original_locator(line: str, tokens: list[str]):
-    # REQ03 section 24: "OSI YY RLOC HDQ8GCPNRSJ" (4 tokens, glued locator)
-    if len(tokens) != 4:
-        raise ElementParseError(
-            f"OSI RLOC line expected exactly 4 tokens ('OSI', airline, "
-            f"'RLOC', glued locator), got {len(tokens)}: {line!r}"
-        )
+def _parse_osi_original_locator(line: str, tokens: list[str], glued_locator: str):
     return OsiOriginalLocatorElement(
         raw=line.strip(),
         airline_code=tokens[1],
-        glued_locator=tokens[3],
+        glued_locator=glued_locator,
     )
 
 
@@ -105,14 +95,16 @@ def parse_osi_line(line: str):
     if is_dob_shape(rest_tokens):
         return parse_dob(stripped, "OSI", rest_tokens)
     if "RLOC" in tokens:
-        if len(tokens) == 5:
+        rloc_index = tokens.index("RLOC")
+        after_rloc = tokens[rloc_index + 1:]
+        if not after_rloc:
+            raise ElementParseError(f"OSI RLOC line has nothing after 'RLOC': {line!r}")
+
+        if len(after_rloc[0]) == 2 and len(after_rloc) == 2:
             return _parse_osi_record_locator(stripped, tokens)
-        if len(tokens) == 4:
-            return _parse_osi_original_locator(stripped, tokens)
-        raise UnrecognizedElementError(
-            f"OSI RLOC line matches neither the 5-token (section 17) nor "
-            f"4-token (section 24) shape: {line!r}"
-        )
+
+        glued_locator = "".join(after_rloc)
+        return _parse_osi_original_locator(stripped, tokens, glued_locator)
     if "CHD" in tokens or "INF" in tokens:
         return _parse_osi_passenger_type_flag(stripped, tokens)
     if _TCP_RE.match(tokens[2]):

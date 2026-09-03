@@ -110,3 +110,50 @@ def test_ssr_foid_leading_digit_not_mistaken_for_party_count():
 def test_not_an_ssr_line_raises():
     with pytest.raises(ElementParseError, match="Not an SSR line"):
         parse_ssr_line("OSI 8G 1BAMBANG/MR E/BUDI@GMAIL.COM")
+
+
+# --------------------------------------------------------------------------
+# WCHR + glued action/count shape (real DVD message traffic, REQ03 section 24)
+# --------------------------------------------------------------------------
+
+def test_wchr_glued_action_count_and_segment_reference():
+    # "SSR WCHR KD NN1ORDPIT0122F15FEB" -- action+count glued directly
+    # onto the segment reference, no space, no trailing '.'/'-' at all.
+    ssr = parse_ssr_line("SSR WCHR KD NN1ORDPIT0122F15FEB")
+    assert ssr.ssr_code == "WCHR"
+    assert ssr.airline_code == "KD"
+    assert ssr.action_code == "NN"
+    assert ssr.number_in_party == 1
+    assert ssr.segment_reference_raw == "ORDPIT0122F15FEB"
+    assert ssr.name is None
+    assert ssr.free_text is None
+
+
+def test_wchr_space_separated_action_count_still_works():
+    # Same code, REQ03's own space-separated shape -- unaffected by
+    # adding the glued fallback.
+    ssr = parse_ssr_line("SSR WCHR KD NN1 ORDPIT0122F15FEB")
+    assert ssr.action_code == "NN"
+    assert ssr.number_in_party == 1
+    assert ssr.segment_reference_raw == "ORDPIT0122F15FEB"
+
+
+def test_automated_ssr_glued_action_count_with_name_reference():
+    # Glued action+count combined with a name reference and free text --
+    # confirms the glued fallback composes correctly with the rest of
+    # the automated SSR grammar, not just the bare minimum case.
+    ssr = parse_ssr_line("SSR VGML SN NN1LHRBRU0604Y25JUN-1AAAAAA/CMR.SPMLREQ")
+    assert ssr.action_code == "NN"
+    assert ssr.number_in_party == 1
+    assert ssr.segment_reference_raw == "LHRBRU0604Y25JUN"
+    assert ssr.name.surname == "AAAAAA"
+    assert ssr.free_text == "SPMLREQ"
+
+
+def test_automated_ssr_without_action_count_still_works():
+    # No action/count at all (text_required=False path) -- confirms
+    # the glued-shape fallback doesn't force a match where there isn't
+    # one, and correctly falls through to no-action-code parsing.
+    ssr = parse_ssr_line("SSR VGML MZ/// 1BBBBB/BMR")
+    assert ssr.action_code is None
+    assert ssr.number_in_party is None

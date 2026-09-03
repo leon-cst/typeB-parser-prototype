@@ -88,15 +88,26 @@ def test_osi_party_count_no_names():
 
 
 def test_osi_original_locator_glued_shape():
-    # REQ03 section 24: "OSI YY RLOC HDQ8GCPNRSJ" -- distinct 4-token
-    # shape from section 17's 5-token "OSI NH RLOC NH CPNRNH"
+    # REQ03 section 24: "OSI YY RLOC HDQ8GCPNRSJ" -- distinguished from
+    # section 17's shape by the token after RLOC being longer than a
+    # 2-character airline code.
     osi = parse_osi_line("OSI YY RLOC HDQ8GCPNRSJ")
     assert osi.airline_code == "YY"
     assert osi.glued_locator == "HDQ8GCPNRSJ"
 
 
+def test_osi_original_locator_spaced_shape_produces_same_result_as_glued():
+    # Same meaning, space where the glued form has none -- both must
+    # produce an identical glued_locator.
+    spaced = parse_osi_line("OSI YY RLOC MADIB CPNRIB")
+    glued = parse_osi_line("OSI YY RLOC MADIBCPNRIB")
+    assert spaced.glued_locator == glued.glued_locator == "MADIBCPNRIB"
+
+
 def test_osi_record_locator_5_token_shape_still_works():
-    # REQ03 section 17 -- unaffected by the new 4-token shape
+    # REQ03 section 17 -- unaffected by the original-locator shapes,
+    # since a real airline code (2 characters) after RLOC is the
+    # disambiguating signal.
     osi = parse_osi_line("OSI NH RLOC NH CPNRNH")
     assert osi.airline_code == "NH"
     assert osi.record_locator_airline == "NH"

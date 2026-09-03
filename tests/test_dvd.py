@@ -148,3 +148,89 @@ SJ920Y15FEB SINAMS HK1
 NNNN"""
     with raises(ElementParseError, match="non-DVD"):
         parse_dvd_message(raw)
+
+
+def test_wchr_glued_action_count():
+    raw = """\
+QU HDQRMKD
+.HDQRMMZ 121030
+DVD
+HDQMZ CPNRMZ CPNRKD
+1CLARK/R
+KD326F 15FEB ORDJFK XX1
+MZ318S15FEB DNVORD HK1/1147 1259
+KD122F15FEB ORDPIT SS1/1355 1609
+SSR WCHR KD NN1ORDPIT0122F15FEB
+OSI YY RLOC HDQMZ CPNRMZ
+NNNN"""
+
+    msg = parse_dvd_message(raw)
+
+    assert len(msg.automated_ssrs) == 1
+    wchr = msg.automated_ssrs[0]
+    assert wchr.ssr_code == "WCHR"
+    assert wchr.action_code == "NN"
+    assert wchr.number_in_party == 1
+    assert wchr.segment_reference_raw == "ORDPIT0122F15FEB"
+    assert msg.warnings == []
+    assert msg.unrecognized_lines == []
+
+
+def test_name_change_and_itinerary_change_same_message():
+    # REQ03 section 28's pattern (name change) combined with an
+    # itinerary rewrite in one DVD -- no envelope record locator at
+    # all, the original PNR is instead carried via OSI YY RLOC.
+    raw = """\
+QU HDQRMKD
+.HDQRMMZ 101030
+DVD
+1JANUS/P
+CHNT
+1EWING/JR
+KD026Y10NOV LAXSAN XX1
+MZ100Y09NOV HOULAX HK1/0948 1121
+KD026Y09NOV LAXSAN SS1/1220 1312
+OSI YY RLOC HDQMZDEFGHG
+NNNN"""
+
+    msg = parse_dvd_message(raw)
+
+    assert msg.is_name_change is True
+    assert len(msg.name_changes) == 1
+    assert msg.name_changes[0].old[0].raw == "1JANUS/P"
+    assert msg.name_changes[0].new[0].raw == "1EWING/JR"
+
+    # displays under the OLD name, same convention as booking's CHNT
+    assert len(msg.passengers) == 1
+    assert msg.passengers[0].surname == "JANUS"
+
+    assert msg.envelope.record_locators == []
+    assert msg.record_locator_recovered_from_osi is True
+    assert msg.original_locators[0].glued_locator == "HDQMZDEFGHG"
+    assert "HDQMZDEFGHG" in msg.airline_record_locators
+
+    assert [(s.airline_code, s.action_code) for s in msg.segments] == [
+        ("KD", "XX"), ("MZ", "HK"), ("KD", "SS"),
+    ]
+    assert msg.warnings == []
+    assert msg.unrecognized_lines == []
+
+
+def test_normal_dvd_record_locator_not_marked_as_recovered():
+    # A DVD with a genuine envelope record locator must NOT be flagged
+    # as OSI-recovered, even though it also has an OSI RLOC line.
+    raw = """\
+QU CGKRMSJ
+.HDQRM8G 101234
+DVD
+HDQ8G CPNRSJ/ABC/12345678/LON/1G/T/GB
+1AAAAA/MR
+SJ920Y15FEB SINAMS XX1
+8G320Y15FEB CGKSIN HK1/1030 1210
+SJ890Y15FEB SINLON SS1/1350 1610
+OSI YY RLOC HDQ8GCPNRSJ"""
+
+    msg = parse_dvd_message(raw)
+
+    assert msg.envelope.record_locators != []
+    assert msg.record_locator_recovered_from_osi is False

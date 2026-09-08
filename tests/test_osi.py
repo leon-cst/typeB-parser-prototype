@@ -87,6 +87,23 @@ def test_osi_party_count_no_names():
     assert osi.names == []
 
 
+def test_osi_party_count_shared_surname_multi_person_entry():
+    # "2AAAAA/LMR/KMRS" is 2 people sharing surname AAAAA -- doesn't
+    # fit NameReference (single person), falls back to the same
+    # shared-surname grammar a NAME line uses (NameElement).
+    osi = parse_osi_line("OSI SJ TCP3 2AAAAA/LMR/KMRS 1BBBBB/MRS")
+    assert osi.total_party_count == 3
+    assert len(osi.names) == 2
+
+    group, single = osi.names
+    assert group.number_in_party == 2
+    assert group.surname == "AAAAA"
+    assert [(p.given_name, p.title) for p in group.people] == [("L", "MR"), ("K", "MRS")]
+
+    assert single.surname == "BBBBB"
+    assert single.title == "MRS"
+
+
 def test_osi_original_locator_glued_shape():
     # REQ03 section 24: "OSI YY RLOC HDQ8GCPNRSJ" -- distinguished from
     # section 17's shape by the token after RLOC being longer than a

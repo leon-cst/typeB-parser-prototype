@@ -4,8 +4,10 @@ import re
 
 from typeb.elements.contact import is_dob_shape, is_email_shape, parse_dob, parse_email_contact
 from typeb.elements.errors import ElementParseError, UnrecognizedElementError
-from typeb.elements.name import parse_name_reference
+from typeb.elements.name import parse_name_element, parse_name_reference
 from typeb.model.elements import (
+    NameElement,
+    NameReference,
     OsiContactAddressElement,
     OsiOriginalLocatorElement,
     OsiPartyCountElement,
@@ -58,11 +60,23 @@ def _parse_osi_record_locator(line: str, tokens: list[str]):
 
 
 def _parse_osi_original_locator(line: str, tokens: list[str], glued_locator: str):
+    
     return OsiOriginalLocatorElement(
         raw=line.strip(),
         airline_code=tokens[1],
         glued_locator=glued_locator,
     )
+
+
+def _parse_party_count_name(token: str) -> NameReference | NameElement:
+
+    try:
+        return parse_name_reference(token)
+    except ElementParseError:
+        pass
+    # Falls back to the shared-surname, multiple-people shape (e.g.
+    # "2AAAAA/LMR/KMRS") -- same grammar a NAME line already uses.
+    return parse_name_element(token)
 
 
 def _parse_osi_party_count(line: str, tokens: list[str]) -> OsiPartyCountElement:
@@ -72,7 +86,7 @@ def _parse_osi_party_count(line: str, tokens: list[str]) -> OsiPartyCountElement
     m = _TCP_RE.match(tokens[2])
     if not m:
         raise ElementParseError(f"OSI TCP line malformed: {line!r}")
-    names = [parse_name_reference(t) for t in tokens[3:]]
+    names = [_parse_party_count_name(t) for t in tokens[3:]]
     return OsiPartyCountElement(
         raw=line.strip(),
         airline_code=tokens[1],

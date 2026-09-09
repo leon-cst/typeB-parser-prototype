@@ -9,9 +9,15 @@ import os
 
 from dotenv import load_dotenv
 from flask import Flask
+from flask_migrate import Migrate
 
 from typeb.extensions import db
 from typeb.web.api import api_bp
+
+# Import so Flask-Migrate's autogenerate can discover the ORM models.
+# Unused directly here, but the import has the side effect of
+# registering Agreement with db.Model's metadata.
+from typeb.db import models as _models  # noqa: F401
 
 load_dotenv()
 
@@ -27,6 +33,7 @@ def create_app(config_overrides: dict | None = None) -> Flask:
         app.config.update(config_overrides)
 
     db.init_app(app)
+    Migrate(app, db)
 
     app.register_blueprint(api_bp)
 

@@ -219,3 +219,9 @@ __marimo__/
 
 # README
 README.md
+
+# DOCKER FILES
+docker-compose.yml
+
+# ENV
+.env

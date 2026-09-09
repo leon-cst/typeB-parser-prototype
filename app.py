@@ -13,6 +13,7 @@ from flask_migrate import Migrate
 
 from typeb.extensions import db
 from typeb.web.api import api_bp
+from typeb.web.dashboard import dashboard_bp
 
 # Import so Flask-Migrate's autogenerate can discover the ORM models.
 # Unused directly here, but the import has the side effect of
@@ -36,6 +37,7 @@ def create_app(config_overrides: dict | None = None) -> Flask:
     Migrate(app, db)
 
     app.register_blueprint(api_bp)
+    app.register_blueprint(dashboard_bp)
 
     return app
 

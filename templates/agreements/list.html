@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Agreements{% endblock %}
+
+{% block content %}
+<h1>Agreement Table</h1>
+
+<p><a href="{{ url_for('dashboard.new_agreement') }}">+ New Agreement</a></p>
+
+<table border="1" cellpadding="6">
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Partner Code</th>
+            <th>Response Format</th>
+            <th>Allowed Dates</th>
+            <th>Allowed Routes</th>
+            <th>Active</th>
+            <th>Updated</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for a in agreements %}
+        <tr>
+            <td>{{ a.Agreement_ID }}</td>
+            <td>{{ a.Partner_Code }}</td>
+            <td>{{ a.Response_Format_Option or "" }}</td>
+            <td>{{ a.Allowed_Dates or "" }}</td>
+            <td>{{ a.Allowed_Routes or "" }}</td>
+            <td>{{ "Yes" if a.is_active else "No" }}</td>
+            <td>{{ a.updated_at.strftime("%Y-%m-%d %H:%M") if a.updated_at else "" }}</td>
+            <td>
+                <a href="{{ url_for('dashboard.edit_agreement', agreement_id=a.Agreement_ID) }}">Edit</a>
+                &nbsp;|&nbsp;
+                <form action="{{ url_for('dashboard.delete_agreement', agreement_id=a.Agreement_ID) }}"
+                      method="post" style="display:inline"
+                      onsubmit="return confirm('Deactivate this agreement?');">
+                    <button type="submit">Delete</button>
+                </form>
+            </td>
+        </tr>
+        {% else %}
+        <tr>
+            <td colspan="8">No agreements yet.</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

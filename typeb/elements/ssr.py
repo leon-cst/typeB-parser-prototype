@@ -12,6 +12,7 @@ from typeb.model.elements import (
     SsrGroupElement,
     SsrGroupFareElement,
     SsrGroupSeatElement,
+    SsrPassengerTypeFlagElement,
     SsrRecordLocatorElement,
     SsrTicketingTimeLimitElement,
     SsrTicketNumberElement,
@@ -290,6 +291,22 @@ def _parse_ssr_tktl(line: str, tokens: list[str]) -> SsrTicketingTimeLimitElemen
     )
 
 
+def _parse_ssr_passenger_type_flag(line: str, tokens: list[str]) -> SsrPassengerTypeFlagElement:
+    if len(tokens) != 5 or tokens[3] not in ("CHD", "INF"):
+        raise ElementParseError(
+            f"SSR passenger-type flag line expected exactly 5 tokens "
+            f"('SSR', airline, an unexplained field, 'CHD' or 'INF', "
+            f"name), e.g. 'SSR 8G 1 INF 1KUSUMA/BAYIBUDI': {line!r}"
+        )
+    return SsrPassengerTypeFlagElement(
+        raw=line.strip(),
+        airline_code=tokens[1],
+        unexplained_field=tokens[2],
+        passenger_type=tokens[3],
+        name=parse_name_reference(tokens[4]),
+    )
+
+
 def _parse_ssr_automated_generic(line: str, tokens: list[str]) -> AutomatedSsrElement:
     code = tokens[1]
     airline, action, count, segref, name, text = _split_automated_ssr(
@@ -343,9 +360,11 @@ def parse_ssr_line(line: str):
         return parse_email_contact(stripped, "SSR", rest_tokens)
     if is_dob_shape(rest_tokens):
         return parse_dob(stripped, "SSR", rest_tokens)
+    if "CHD" in rest_tokens or "INF" in rest_tokens:
+        return _parse_ssr_passenger_type_flag(stripped, tokens)
 
     raise UnrecognizedElementError(
         f"No parser implemented yet for SSR code {ssr_code!r} -- "
         f"currently supported codes: {sorted(_SSR_HANDLERS)}, plus the "
-        f"code-less email/DOB shape. Line: {line!r}"
+        f"code-less email/DOB/passenger-type-flag shape. Line: {line!r}"
     )

@@ -3,7 +3,7 @@ from __future__ import annotations
 from typeb.elements.cross_reference import cross_reference_passengers, validate_party_size
 from typeb.elements.errors import ElementParseError
 from typeb.envelope.parser import parse_envelope
-from typeb.messages._shared_body import parse_shared_body
+from typeb.messages._shared_body import is_osi_element, parse_shared_body
 from typeb.model.booking import BookingMessage, GroupPlaceholder
 from typeb.model.elements import (
     AutomatedSsrElement,
@@ -14,6 +14,7 @@ from typeb.model.elements import (
     SsrGroupElement,
     SsrGroupFareElement,
     SsrGroupSeatElement,
+    SsrPassengerTypeFlagElement,
     SsrRecordLocatorElement,
 )
 
@@ -21,12 +22,11 @@ from typeb.model.elements import (
 def parse_booking_message(raw: str) -> BookingMessage:
     envelope, body_lines, warnings = parse_envelope(raw)
 
-    if envelope.effective_identifier != "BOOKING":
+    if envelope.effective_identifier != "BOOKING" and envelope.effective_identifier != "TLR":
         raise ElementParseError(
             f"parse_booking_message called on a non-booking message "
             f"(identifier={envelope.effective_identifier!r})."
         )
-
     body = parse_shared_body(body_lines, warnings)
 
     # No reliable wire-level signal distinguishes ARRIVAL from SEGMENT
@@ -70,10 +70,16 @@ def parse_booking_message(raw: str) -> BookingMessage:
     group_seat_requests = [e for e in body.contact_elements if isinstance(e, SsrGroupSeatElement)]
     contact_addresses = [e for e in body.contact_elements if isinstance(e, OsiContactAddressElement)]
     party_count_notices = [e for e in body.contact_elements if isinstance(e, OsiPartyCountElement)]
-    automated_ssrs = [e for e in body.contact_elements if isinstance(e, AutomatedSsrElement)]
+    automated_ssrs = [
+        e for e in body.contact_elements
+        if isinstance(e, (AutomatedSsrElement, SsrPassengerTypeFlagElement))
+    ]
+    osi_elements = [e for e in body.contact_elements if is_osi_element(e)]
 
     for segment in body.segments:
         validate_party_size(body.current_name_elements, segment.number_in_party)
+        
+    print('passengers123 : ',passengers)
 
     return BookingMessage(
         envelope=envelope,
@@ -89,6 +95,7 @@ def parse_booking_message(raw: str) -> BookingMessage:
         contact_addresses=contact_addresses,
         party_count_notices=party_count_notices,
         automated_ssrs=automated_ssrs,
+        osi_elements=osi_elements,
         warnings=body.warnings,
         unrecognized_lines=body.unrecognized_lines,
     )

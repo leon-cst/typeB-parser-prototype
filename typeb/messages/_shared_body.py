@@ -22,7 +22,36 @@ from typeb.elements.ssr import parse_ssr_line
 from typeb.elements.tokenizer import ElementKind, tokenize_body
 from typeb.envelope.parser import _DEFAULT_MAX_LINE_LENGTH
 from typeb.model.common import UnrecognizedLine
-from typeb.model.elements import NameElement, SegmentElement
+from typeb.model.elements import (
+    DobElement,
+    EmailContactElement,
+    NameElement,
+    OsiContactAddressElement,
+    OsiOriginalLocatorElement,
+    OsiPartyCountElement,
+    OsiPassengerTypeFlagElement,
+    OsiRecordLocatorElement,
+    SegmentElement,
+)
+
+_OSI_ELEMENT_TYPES = (
+    OsiContactAddressElement,
+    OsiOriginalLocatorElement,
+    OsiPartyCountElement,
+    OsiPassengerTypeFlagElement,
+    OsiRecordLocatorElement,
+)
+
+
+def is_osi_element(element) -> bool:
+    """True for a contact_elements entry that came from an OSI line.
+    EmailContactElement/DobElement are shared with SSR, so those are
+    only OSI when their own `source` field says so."""
+    if isinstance(element, _OSI_ELEMENT_TYPES):
+        return True
+    if isinstance(element, (EmailContactElement, DobElement)):
+        return element.source == "OSI"
+    return False
 
 
 @dataclass

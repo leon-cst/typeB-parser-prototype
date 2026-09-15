@@ -12,6 +12,7 @@ from typeb.model.elements import (
     OsiPassengerTypeFlagElement,
     SsrChildOrInfantFlagElement,
     SsrFoidElement,
+    SsrPassengerTypeFlagElement,
     SsrTicketNumberElement,
 )
 from typeb.model.passenger import BookingPassenger, TicketNumberRecord
@@ -22,6 +23,7 @@ ContactElement = Union[
     EmailContactElement,
     DobElement,
     OsiPassengerTypeFlagElement,
+    SsrPassengerTypeFlagElement,
     SsrTicketNumberElement,
     AutomatedSsrElement,
 ]
@@ -44,7 +46,6 @@ def cross_reference_passengers(
 ) -> list[BookingPassenger]:
     pool: dict[PassengerKey, dict] = {}
     order: list[PassengerKey] = []
-
     for ne in name_elements:
         if ne.is_group_placeholder:
             continue
@@ -77,7 +78,6 @@ def cross_reference_passengers(
                 "_ticket_number_groups": {},  # ticket_number -> {"airline_code": str, "segments": [...]}
             }
             order.append(key)
-
 
     old_name_keys: dict[PassengerKey, PassengerKey] = {}
     if name_changes:
@@ -166,7 +166,6 @@ def cross_reference_passengers(
     for new_key, old_key in old_name_keys.items():
         record = pool[new_key]
         record["surname"], record["given_name"], record["title"] = old_key
-
     return [_finalize_passenger(pool[key]) for key in order]
 
 
@@ -198,6 +197,10 @@ def _apply_element(record: dict, element: ContactElement) -> None:
         record["date_of_birth_raw"] = element.date_of_birth_raw
 
     elif isinstance(element, OsiPassengerTypeFlagElement):
+        new_type = "INF" if element.passenger_type == "INF" else "CHD"
+        _set_passenger_type(record, new_type, element)
+
+    elif isinstance(element, SsrPassengerTypeFlagElement):
         new_type = "INF" if element.passenger_type == "INF" else "CHD"
         _set_passenger_type(record, new_type, element)
 

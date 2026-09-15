@@ -1,53 +1,88 @@
 {% extends "base.html" %}
+
 {% block title %}{{ "Edit" if agreement else "New" }} Agreement{% endblock %}
+{% block page_heading %}{{ "Edit" if agreement else "New" }} Agreement{% endblock %}
+{% block breadcrumb_current %}{{ "Edit" if agreement else "New" }}{% endblock %}
 
 {% block content %}
-<h1>{{ "Edit" if agreement else "New" }} Agreement</h1>
+<div class="row">
+    <div class="col-xl-6">
+        <div class="card">
+            <div class="card-body">
 
-<form method="post">
-    {{ form.hidden_tag() }}
+                <h4 class="card-title mb-4">
+                    {{ "Edit" if agreement else "New" }} Agreement
+                    {% if agreement %}<small class="text-muted">#{{ agreement.Agreement_ID }}</small>{% endif %}
+                </h4>
 
-    <p>
-        {{ form.Partner_Code.label }}<br>
-        {{ form.Partner_Code(size=10) }}
-        {% for error in form.Partner_Code.errors %}
-            <br><span style="color:red">{{ error }}</span>
-        {% endfor %}
-    </p>
+                <form method="post">
+                    {{ form.hidden_tag() }}
 
-    <p>
-        {{ form.Response_Format_Option.label }}<br>
-        {{ form.Response_Format_Option(size=30) }}
-        {% for error in form.Response_Format_Option.errors %}
-            <br><span style="color:red">{{ error }}</span>
-        {% endfor %}
-    </p>
+                    <div class="mb-3 row">
+                        <label for="{{ form.Partner_Code.id }}" class="col-md-3 col-form-label">Partner Code</label>
+                        <div class="col-md-9">
+                            {{ form.Partner_Code(class="form-control" + (" is-invalid" if form.Partner_Code.errors else "")) }}
+                            {% for error in form.Partner_Code.errors %}
+                                <div class="invalid-feedback">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                    </div>
 
-    <p>
-        {{ form.Allowed_Dates.label }}<br>
-        {{ form.Allowed_Dates(size=30) }}
-        {% for error in form.Allowed_Dates.errors %}
-            <br><span style="color:red">{{ error }}</span>
-        {% endfor %}
-    </p>
+                    <div class="mb-3 row">
+                        <label for="{{ form.Response_Format_Option.id }}" class="col-md-3 col-form-label">Response Format Option</label>
+                        <div class="col-md-9">
+                            {{ form.Response_Format_Option(class="form-control" + (" is-invalid" if form.Response_Format_Option.errors else "")) }}
+                            {% for error in form.Response_Format_Option.errors %}
+                                <div class="invalid-feedback">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                    </div>
 
-    <p>
-        {{ form.Allowed_Routes.label }}<br>
-        {{ form.Allowed_Routes(size=30) }}
-        {% for error in form.Allowed_Routes.errors %}
-            <br><span style="color:red">{{ error }}</span>
-        {% endfor %}
-        <br><small>Comma-separated 3-letter city codes, e.g. CGK,SIN</small>
-    </p>
+                    <div class="mb-3 row">
+                        <label for="{{ form.Allowed_Dates.id }}" class="col-md-3 col-form-label">Allowed Dates</label>
+                        <div class="col-md-9">
+                            {{ form.Allowed_Dates(class="form-control" + (" is-invalid" if form.Allowed_Dates.errors else "")) }}
+                            {% for error in form.Allowed_Dates.errors %}
+                                <div class="invalid-feedback">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                    </div>
 
-    <p>
-        {{ form.is_active.label }}
-        {{ form.is_active() }}
-    </p>
+                    <div class="mb-3 row">
+                        <label for="{{ form.Allowed_Routes.id }}" class="col-md-3 col-form-label">Allowed Routes</label>
+                        <div class="col-md-9">
+                            {{ form.Allowed_Routes(class="form-control" + (" is-invalid" if form.Allowed_Routes.errors else "")) }}
+                            {% for error in form.Allowed_Routes.errors %}
+                                <div class="invalid-feedback">{{ error }}</div>
+                            {% endfor %}
+                            <div class="form-text">Comma-separated 3-letter city codes, e.g. CGK,SIN</div>
+                        </div>
+                    </div>
 
-    <p>
-        <button type="submit">Save</button>
-        <a href="{{ url_for('dashboard.list_agreements') }}">Cancel</a>
-    </p>
-</form>
+                    <div class="mb-3 row">
+                        <div class="col-md-9 offset-md-3">
+                            <div class="form-check">
+                                {{ form.is_active(class="form-check-input") }}
+                                <label class="form-check-label" for="{{ form.is_active.id }}">Active</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-9 offset-md-3">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bx bx-save me-1"></i> Save
+                            </button>
+                            <a href="{{ url_for('dashboard.list_agreements') }}" class="btn btn-secondary">
+                                Cancel
+                            </a>
+                        </div>
+                    </div>
+
+                </form>
+
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}

@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block title %}{{ "Edit" if identifier else "New" }} Message Identifier{% endblock %}
+{% block page_heading %}{{ "Edit" if identifier else "New" }} Message Identifier{% endblock %}
+{% block breadcrumb_current %}{{ "Edit" if identifier else "New" }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-xl-6">
+        <div class="card">
+            <div class="card-body">
+
+                <h4 class="card-title mb-4">
+                    {{ "Edit" if identifier else "New" }} Message Identifier
+                </h4>
+
+                <form method="post">
+                    {{ form.hidden_tag() }}
+
+                    <div class="mb-3 row">
+                        <label for="{{ form.Msg_Identifier_Code.id }}" class="col-md-3 col-form-label">Code</label>
+                        <div class="col-md-9">
+                            {% if identifier %}
+                                {{ form.Msg_Identifier_Code(class="form-control", readonly=true) }}
+                                <div class="form-text">Code cannot be changed after creation.</div>
+                            {% else %}
+                                {{ form.Msg_Identifier_Code(class="form-control" + (" is-invalid" if form.Msg_Identifier_Code.errors else ""), maxlength=3) }}
+                                {% for error in form.Msg_Identifier_Code.errors %}
+                                    <div class="invalid-feedback">{{ error }}</div>
+                                {% endfor %}
+                                <div class="form-text">Exactly 3 characters, e.g. AVN</div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="mb-3 row">
+                        <label for="{{ form.Description.id }}" class="col-md-3 col-form-label">Description</label>
+                        <div class="col-md-9">
+                            {{ form.Description(class="form-control" + (" is-invalid" if form.Description.errors else "")) }}
+                            {% for error in form.Description.errors %}
+                                <div class="invalid-feedback">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-9 offset-md-3">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bx bx-save me-1"></i> Save
+                            </button>
+                            <a href="{{ url_for('dashboard.list_message_identifiers') }}" class="btn btn-secondary">
+                                Cancel
+                            </a>
+                        </div>
+                    </div>
+
+                </form>
+
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

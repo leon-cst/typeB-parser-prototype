@@ -9,6 +9,7 @@ import os
 
 from dotenv import load_dotenv
 from flask import Flask
+from flask import send_from_directory
 from flask_migrate import Migrate
 
 from typeb.extensions import db
@@ -38,6 +39,12 @@ def create_app(config_overrides: dict | None = None) -> Flask:
 
     app.register_blueprint(api_bp)
     app.register_blueprint(dashboard_bp)
+
+    @app.route("/assets/<path:filename>")
+    def skote_assets_alias(filename):
+        return send_from_directory(
+            os.path.join(app.static_folder, "skote", "assets"), filename
+        )
 
     return app
 

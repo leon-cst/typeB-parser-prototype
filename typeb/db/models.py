@@ -46,3 +46,35 @@ class Agreement(db.Model):
 
     def __repr__(self) -> str:
         return f"<Agreement {self.Agreement_ID} partner={self.Partner_Code!r}>"
+
+
+class MessageIdentifier(db.Model):
+    __tablename__ = "MESSAGE_IDENTIFIER"
+
+    Msg_Identifier_Code = db.Column(db.String(3), primary_key=True)
+    Description = db.Column(db.String(255), nullable=True)
+
+    def __repr__(self) -> str:
+        return f"<MessageIdentifier {self.Msg_Identifier_Code!r}>"
+
+
+class InventoryAvailability(db.Model):
+    __tablename__ = "INVENTORY_AVAILABILITY"
+
+    Inventory_ID = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    Flight_Number = db.Column(db.String(10), nullable=False)
+    Flight_Date = db.Column(db.Date, nullable=False)
+    Boarding_Point = db.Column(db.String(3), nullable=False)
+    Off_Point = db.Column(db.String(3), nullable=False)
+    RBD_Class = db.Column(db.String(1), nullable=False)
+    Segment_Status_Code = db.Column(db.String(5), nullable=True)
+    Numeric_Availability = db.Column(db.String(10), nullable=True)
+
+    source = db.Column(db.String(10), nullable=False, default="manual")
+
+    def __repr__(self) -> str:
+        return (
+            f"<InventoryAvailability {self.Flight_Number} "
+            f"{self.Flight_Date} {self.Boarding_Point}-{self.Off_Point} "
+            f"{self.RBD_Class}>"
+        )

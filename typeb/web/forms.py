@@ -53,3 +53,17 @@ class AgreementForm(FlaskForm):
     )
 
     is_active = BooleanField("Active", default=True)
+
+
+class MessageIdentifierForm(FlaskForm):
+    Msg_Identifier_Code = StringField(
+        "Message Identifier Code",
+        validators=[DataRequired(), Length(min=3, max=3)],
+        filters=[lambda v: v.strip().upper() if v else v],
+    )
+
+    Description = StringField(
+        "Description",
+        validators=[Optional(), Length(max=255)],
+        filters=[lambda v: v.strip() if v else v],
+    )

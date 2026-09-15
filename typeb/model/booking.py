@@ -7,10 +7,12 @@ from typeb.model.elements import (
     NameChange,
     NameElement,
     OsiContactAddressElement,
+    OsiElement,
     OsiPartyCountElement,
     SegmentElement,
     SsrGroupFareElement,
     SsrGroupSeatElement,
+    SsrPassengerTypeFlagElement,
 )
 from typeb.model.envelope import Envelope
 from typeb.model.passenger import BookingPassenger
@@ -43,7 +45,8 @@ class BookingMessage(BaseModel):
     group_seat_requests: list[SsrGroupSeatElement]
     contact_addresses: list[OsiContactAddressElement]
     party_count_notices: list[OsiPartyCountElement] = []
-    automated_ssrs: list[AutomatedSsrElement] = []
+    automated_ssrs: list[AutomatedSsrElement | SsrPassengerTypeFlagElement] = []
+    osi_elements: list[OsiElement] = []
     warnings: list[str]
     unrecognized_lines: list[UnrecognizedLine]
 

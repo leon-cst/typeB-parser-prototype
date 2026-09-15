@@ -4,6 +4,8 @@ Domain models for the element layer.
 """
 from __future__ import annotations
 
+from typing import Union
+
 from pydantic import BaseModel, ConfigDict
 
 
@@ -174,6 +176,20 @@ class OsiPassengerTypeFlagElement(BaseModel):
     passenger_type: str  # "CHD" or "INF"
     name: NameReference
 
+
+class SsrPassengerTypeFlagElement(BaseModel):
+    """Codeless SSR passenger-type flag, e.g. 'SSR 8G 1 INF
+    1KUSUMA/BAYIBUDI' -- same shape as OsiPassengerTypeFlagElement but
+    carried on an SSR line instead of OSI."""
+
+    model_config = ConfigDict(frozen=True, str_strip_whitespace=True, str_to_upper=True)
+
+    raw: str
+    airline_code: str
+    unexplained_field: str
+    passenger_type: str  # "CHD" or "INF"
+    name: NameReference
+
 class SsrTicketNumberElement(BaseModel):
     model_config = ConfigDict(frozen=True, str_strip_whitespace=True, str_to_upper=True)
  
@@ -296,3 +312,17 @@ class AutomatedSsrElement(BaseModel):
     segment_reference_raw: str
     name: NameReference | NameElement | None
     free_text: str | None
+
+
+# Every contact_elements entry that can come from an OSI line -- includes
+# EmailContactElement/DobElement, whose `source` field distinguishes an
+# OSI origin from an SSR one (see is_osi_element in _shared_body.py).
+OsiElement = Union[
+    OsiContactAddressElement,
+    OsiOriginalLocatorElement,
+    OsiPartyCountElement,
+    OsiPassengerTypeFlagElement,
+    OsiRecordLocatorElement,
+    EmailContactElement,
+    DobElement,
+]

@@ -3,13 +3,14 @@ from __future__ import annotations
 from typeb.elements.cross_reference import cross_reference_passengers, validate_party_size
 from typeb.elements.errors import ElementParseError
 from typeb.envelope.parser import parse_envelope
-from typeb.messages._shared_body import parse_shared_body
+from typeb.messages._shared_body import is_osi_element, parse_shared_body
 from typeb.model.dvd import DvdMessage
 from typeb.model.elements import (
     AutomatedSsrElement,
     OsiOriginalLocatorElement,
     OsiPartyCountElement,
     OsiRecordLocatorElement,
+    SsrPassengerTypeFlagElement,
     SsrRecordLocatorElement,
 )
 
@@ -48,8 +49,12 @@ def parse_dvd_message(raw: str) -> DvdMessage:
             *(loc.glued_locator for loc in original_locators),
         ]
 
-    automated_ssrs = [e for e in body.contact_elements if isinstance(e, AutomatedSsrElement)]
+    automated_ssrs = [
+        e for e in body.contact_elements
+        if isinstance(e, (AutomatedSsrElement, SsrPassengerTypeFlagElement))
+    ]
     party_count_notices = [e for e in body.contact_elements if isinstance(e, OsiPartyCountElement)]
+    osi_elements = [e for e in body.contact_elements if is_osi_element(e)]
 
     for segment in body.segments:
         validate_party_size(body.current_name_elements, segment.number_in_party)
@@ -59,6 +64,7 @@ def parse_dvd_message(raw: str) -> DvdMessage:
         airline_record_locators=airline_record_locators,
         automated_ssrs=automated_ssrs,
         party_count_notices=party_count_notices,
+        osi_elements=osi_elements,
         passengers=passengers,
         name_elements=body.name_elements,
         name_changes=body.name_changes,

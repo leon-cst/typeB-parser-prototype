@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+
+{% block title %}{{ "Edit" if row else "New" }} Inventory Row{% endblock %}
+{% block page_heading %}{{ "Edit" if row else "New" }} Inventory Row{% endblock %}
+{% block breadcrumb_current %}{{ "Edit" if row else "New" }}{% endblock %}
+
+{% block extra_css %}
+<link href="{{ url_for('static', filename='skote/assets/libs/select2/select2.min.css') }}" rel="stylesheet" type="text/css">
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-xl-6">
+        <div class="card">
+            <div class="card-body">
+
+                <h4 class="card-title mb-4">
+                    {{ "Edit" if row else "New" }} Inventory Row
+                    {% if row %}<small class="text-muted">#{{ row.Inventory_ID }}</small>{% endif %}
+                </h4>
+
+                <form method="post">
+                    {{ form.hidden_tag() }}
+
+                    <div class="mb-3 row">
+                        <label class="col-md-3 col-form-label">Flight Number</label>
+                        <div class="col-md-9">
+                            {{ form.Flight_Number(class="form-control" + (" is-invalid" if form.Flight_Number.errors else "")) }}
+                            {% for error in form.Flight_Number.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="mb-3 row">
+                        <label class="col-md-3 col-form-label">Flight Date</label>
+                        <div class="col-md-9">
+                            {{ form.Flight_Date(class="form-control" + (" is-invalid" if form.Flight_Date.errors else ""), placeholder="YYYY-MM-DD") }}
+                            {% for error in form.Flight_Date.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="mb-3 row">
+                        <label class="col-md-3 col-form-label">Boarding Point</label>
+                        <div class="col-md-9">
+                            {{ form.Boarding_Point(class="form-control" + (" is-invalid" if form.Boarding_Point.errors else ""), maxlength=3) }}
+                            {% for error in form.Boarding_Point.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="mb-3 row">
+                        <label class="col-md-3 col-form-label">Off Point</label>
+                        <div class="col-md-9">
+                            {{ form.Off_Point(class="form-control" + (" is-invalid" if form.Off_Point.errors else ""), maxlength=3) }}
+                            {% for error in form.Off_Point.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="mb-3 row">
+                        <label class="col-md-3 col-form-label">RBD Class</label>
+                        <div class="col-md-9">
+                            {{ form.RBD_Class(class="form-control" + (" is-invalid" if form.RBD_Class.errors else ""), maxlength=1) }}
+                            {% for error in form.RBD_Class.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                            <div class="form-text">Single letter booking class, e.g. Y, J, C</div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3 row">
+                        <label class="col-md-3 col-form-label">Segment Status Code</label>
+                        <div class="col-md-9">
+                            {{ form.Segment_Status_Code(class="form-select select2-status-code") }}
+                        </div>
+                    </div>
+
+                    <div class="mb-3 row">
+                        <label class="col-md-3 col-form-label">Numeric Availability</label>
+                        <div class="col-md-9">
+                            {{ form.Numeric_Availability(class="form-control" + (" is-invalid" if form.Numeric_Availability.errors else "")) }}
+                            {% for error in form.Numeric_Availability.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-9 offset-md-3">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bx bx-save me-1"></i> Save
+                            </button>
+                            <a href="{{ url_for('dashboard.list_inventory') }}" class="btn btn-secondary">
+                                Cancel
+                            </a>
+                        </div>
+                    </div>
+
+                </form>
+
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='skote/assets/libs/select2/select2.min.js') }}"></script>
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        $('.select2-status-code').select2({
+            width: '100%',
+            placeholder: 'Search status code...'
+        });
+    });
+</script>
+{% endblock %}

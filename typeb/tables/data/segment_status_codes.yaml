@@ -99,7 +99,7 @@ entries:
   - code: HX
     category: unable_cancel
     description: Cancelled
-  - code: NO
+  - code: "NO"
     category: unable_cancel
     description: No action taken
   - code: UC

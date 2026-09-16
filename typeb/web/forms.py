@@ -8,8 +8,8 @@ typeb/db/models.py for the same caveat on those two columns.
 import re
 
 from flask_wtf import FlaskForm
-from wtforms import BooleanField, StringField
-from wtforms.validators import DataRequired, Length, Optional, Regexp
+from wtforms import BooleanField, StringField, SelectField
+from wtforms.validators import DataRequired, Length, Optional, Regexp, NumberRange
 
 # Loosely validates a comma-separated list of 3-letter IATA city/airport
 # codes, e.g. "CGK,SIN" or "CGK, SIN, DPS". Tighten once Parka confirms
@@ -66,4 +66,49 @@ class MessageIdentifierForm(FlaskForm):
         "Description",
         validators=[Optional(), Length(max=255)],
         filters=[lambda v: v.strip() if v else v],
+    )
+
+
+class InventoryAvailabilityForm(FlaskForm):
+    Flight_Number = StringField(
+        "Flight Number",
+        validators=[DataRequired(), Length(max=10)],
+        filters=[lambda v: v.strip().upper() if v else v],
+    )
+
+    Flight_Date = StringField(
+        "Flight Date (YYYY-MM-DD)",
+        validators=[DataRequired()],
+        filters=[lambda v: v.strip() if v else v],
+    )
+
+    Boarding_Point = StringField(
+        "Boarding Point",
+        validators=[DataRequired(), Length(min=3, max=3)],
+        filters=[lambda v: v.strip().upper() if v else v],
+    )
+
+    Off_Point = StringField(
+        "Off Point",
+        validators=[DataRequired(), Length(min=3, max=3)],
+        filters=[lambda v: v.strip().upper() if v else v],
+    )
+
+    RBD_Class = StringField(
+        "RBD Class (1 letter)",
+        validators=[DataRequired(), Length(min=1, max=1)],
+        filters=[lambda v: v.strip().upper() if v else v],
+    )
+
+    # choices populated in the route, since it depends on loader.py data
+    Segment_Status_Code = SelectField(
+        "Segment Status Code",
+        validators=[Optional()],
+        choices=[],
+    )
+
+    Numeric_Availability = StringField(
+        "Numeric Availability",
+        validators=[Optional(), Length(max=10)],
+        filters=[lambda v: v.strip().upper() if v else v],
     )

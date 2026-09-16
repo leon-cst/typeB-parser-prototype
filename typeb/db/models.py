@@ -78,3 +78,22 @@ class InventoryAvailability(db.Model):
             f"{self.Flight_Date} {self.Boarding_Point}-{self.Off_Point} "
             f"{self.RBD_Class}>"
         )
+
+
+class Pnr(db.Model):
+    __tablename__ = "PNR"
+
+    PNR_ID = db.Column(db.Integer, primary_key=True, autoincrement=True)
+
+    PNR_Code = db.Column(db.String(10), nullable=False, index=True)
+
+    Booking_Office_Code = db.Column(db.String(10), nullable=False)
+    POS_Travel_Agent_ID = db.Column(db.String(20), nullable=True)
+    POS_City_Code = db.Column(db.String(3), nullable=True)
+    POS_User_Type = db.Column(db.String(5), nullable=True)
+    Creation_Date = db.Column(db.DateTime(timezone=True), nullable=False, default=_utcnow)
+
+    source = db.Column(db.String(10), nullable=False, default="manual")
+
+    def __repr__(self) -> str:
+        return f"<Pnr {self.PNR_ID} code={self.PNR_Code!r}>"

@@ -9,8 +9,10 @@ state is worth keeping.
 from flask import Blueprint, abort, flash, redirect, render_template, url_for
 
 from typeb.extensions import db
-from typeb.db.models import Agreement, MessageIdentifier
-from typeb.web.forms import AgreementForm, MessageIdentifierForm
+from typeb.db.models import Agreement, MessageIdentifier, InventoryAvailability
+from typeb.web.forms import AgreementForm, MessageIdentifierForm, InventoryAvailabilityForm
+from typeb.tables import loader
+from datetime import date
 
 dashboard_bp = Blueprint("dashboard", __name__, url_prefix="/agreements")
 
@@ -130,3 +132,96 @@ def delete_message_identifier(code):
     db.session.commit()
     flash(f"Message identifier {code} deleted.", "success")
     return redirect(url_for("dashboard.list_message_identifiers"))
+
+def _segment_status_choices():
+    entries = loader.segment_status_codes()
+    choices = [("", "-- none --")]
+    choices += [
+        (code, f"{code} — {entry.description}")
+        for code, entry in sorted(entries.items(), key=lambda pair: pair[0])
+    ]
+    return choices
+
+
+@dashboard_bp.get("/inventory/")
+def list_inventory():
+    rows = (
+        InventoryAvailability.query
+        .order_by(InventoryAvailability.Flight_Date, InventoryAvailability.Flight_Number)
+        .all()
+    )
+    return render_template("inventory/list.html", rows=rows)
+
+
+@dashboard_bp.route("/inventory/new", methods=["GET", "POST"])
+def new_inventory():
+    form = InventoryAvailabilityForm()
+    form.Segment_Status_Code.choices = _segment_status_choices()
+
+    if form.validate_on_submit():
+        try:
+            flight_date = date.fromisoformat(form.Flight_Date.data)
+        except ValueError:
+            form.Flight_Date.errors.append("Expected format YYYY-MM-DD.")
+            return render_template("inventory/form.html", form=form, row=None)
+
+        row = InventoryAvailability(
+            Flight_Number=form.Flight_Number.data,
+            Flight_Date=flight_date,
+            Boarding_Point=form.Boarding_Point.data,
+            Off_Point=form.Off_Point.data,
+            RBD_Class=form.RBD_Class.data,
+            Segment_Status_Code=form.Segment_Status_Code.data or None,
+            Numeric_Availability=form.Numeric_Availability.data or None,
+            source="manual",
+        )
+        db.session.add(row)
+        db.session.commit()
+        flash(f"Inventory row for {row.Flight_Number} created.", "success")
+        return redirect(url_for("dashboard.list_inventory"))
+
+    return render_template("inventory/form.html", form=form, row=None)
+
+
+@dashboard_bp.route("/inventory/<int:inventory_id>/edit", methods=["GET", "POST"])
+def edit_inventory(inventory_id):
+    row = db.session.get(InventoryAvailability, inventory_id)
+    if row is None:
+        abort(404)
+
+    form = InventoryAvailabilityForm(obj=row, Flight_Date=row.Flight_Date.isoformat())
+    form.Segment_Status_Code.choices = _segment_status_choices()
+
+    if form.validate_on_submit():
+        try:
+            flight_date = date.fromisoformat(form.Flight_Date.data)
+        except ValueError:
+            form.Flight_Date.errors.append("Expected format YYYY-MM-DD.")
+            return render_template("inventory/form.html", form=form, row=row)
+
+        row.Flight_Number = form.Flight_Number.data
+        row.Flight_Date = flight_date
+        row.Boarding_Point = form.Boarding_Point.data
+        row.Off_Point = form.Off_Point.data
+        row.RBD_Class = form.RBD_Class.data
+        row.Segment_Status_Code = form.Segment_Status_Code.data or None
+        row.Numeric_Availability = form.Numeric_Availability.data or None
+        # source deliberately left untouched -- editing a parser-written
+        # row through the manual form doesn't make it a manual row
+        db.session.commit()
+        flash(f"Inventory row for {row.Flight_Number} updated.", "success")
+        return redirect(url_for("dashboard.list_inventory"))
+
+    return render_template("inventory/form.html", form=form, row=row)
+
+
+@dashboard_bp.post("/inventory/<int:inventory_id>/delete")
+def delete_inventory(inventory_id):
+    row = db.session.get(InventoryAvailability, inventory_id)
+    if row is None:
+        abort(404)
+
+    db.session.delete(row)
+    db.session.commit()
+    flash(f"Inventory row for {row.Flight_Number} deleted.", "success")
+    return redirect(url_for("dashboard.list_inventory"))

@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block title %}PNRs{% endblock %}
+{% block page_heading %}PNRs{% endblock %}
+{% block breadcrumb_current %}PNRs{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h4 class="card-title mb-0">PNRs</h4>
+                    <a href="{{ url_for('dashboard.new_pnr') }}" class="btn btn-primary">
+                        <i class="bx bx-plus me-1"></i> New PNR
+                    </a>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-bordered mb-0">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>PNR Code</th>
+                                <th>Booking Office</th>
+                                <th>Travel Agent ID</th>
+                                <th>POS City</th>
+                                <th>POS User Type</th>
+                                <th>Created</th>
+                                <th>Source</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for p in pnrs %}
+                            <tr>
+                                <td>{{ p.PNR_ID }}</td>
+                                <td><code>{{ p.PNR_Code }}</code></td>
+                                <td>{{ p.Booking_Office_Code }}</td>
+                                <td>{{ p.POS_Travel_Agent_ID or "—" }}</td>
+                                <td>{{ p.POS_City_Code or "—" }}</td>
+                                <td>{{ p.POS_User_Type or "—" }}</td>
+                                <td>{{ p.Creation_Date.strftime("%Y-%m-%d %H:%M") if p.Creation_Date else "" }}</td>
+                                <td>
+                                    {% if p.source == "manual" %}
+                                        <span class="badge bg-info">Manual</span>
+                                    {% else %}
+                                        <span class="badge bg-warning">{{ p.source }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <a href="{{ url_for('dashboard.edit_pnr', pnr_id=p.PNR_ID) }}"
+                                       class="btn btn-sm btn-soft-info me-1">
+                                        <i class="bx bx-edit"></i> Edit
+                                    </a>
+                                    <form action="{{ url_for('dashboard.delete_pnr', pnr_id=p.PNR_ID) }}"
+                                          method="post" style="display:inline"
+                                          onsubmit="return confirm('Delete this PNR? This cannot be undone.');">
+                                        <button type="submit" class="btn btn-sm btn-soft-danger">
+                                            <i class="bx bx-trash"></i> Delete
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="9" class="text-center text-muted">No PNRs yet.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

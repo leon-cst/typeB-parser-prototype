@@ -112,3 +112,35 @@ class InventoryAvailabilityForm(FlaskForm):
         validators=[Optional(), Length(max=10)],
         filters=[lambda v: v.strip().upper() if v else v],
     )
+
+
+class PnrForm(FlaskForm):
+    PNR_Code = StringField(
+        "PNR Code",
+        validators=[DataRequired(), Length(max=10)],
+        filters=[lambda v: v.strip().upper() if v else v],
+    )
+
+    Booking_Office_Code = StringField(
+        "Booking Office Code",
+        validators=[DataRequired(), Length(max=10)],
+        filters=[lambda v: v.strip().upper() if v else v],
+    )
+
+    POS_Travel_Agent_ID = StringField(
+        "POS Travel Agent ID",
+        validators=[Optional(), Length(max=20)],
+        filters=[lambda v: v.strip() if v else v],
+    )
+
+    POS_City_Code = StringField(
+        "POS City Code",
+        validators=[Optional(), Length(min=3, max=3)],
+        filters=[lambda v: v.strip().upper() if v else v],
+    )
+
+    POS_User_Type = StringField(
+        "POS User Type",
+        validators=[Optional(), Length(max=5)],
+        filters=[lambda v: v.strip().upper() if v else v],
+    )

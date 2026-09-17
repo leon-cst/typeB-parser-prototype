@@ -9,8 +9,8 @@ state is worth keeping.
 from flask import Blueprint, abort, flash, redirect, render_template, url_for
 
 from typeb.extensions import db
-from typeb.db.models import Agreement, MessageIdentifier, InventoryAvailability
-from typeb.web.forms import AgreementForm, MessageIdentifierForm, InventoryAvailabilityForm
+from typeb.db.models import Agreement, MessageIdentifier, InventoryAvailability, Pnr
+from typeb.web.forms import AgreementForm, MessageIdentifierForm, InventoryAvailabilityForm, PnrForm
 from typeb.tables import loader
 from datetime import date
 
@@ -225,3 +225,65 @@ def delete_inventory(inventory_id):
     db.session.commit()
     flash(f"Inventory row for {row.Flight_Number} deleted.", "success")
     return redirect(url_for("dashboard.list_inventory"))
+
+
+@dashboard_bp.get("/pnrs/")
+def list_pnrs():
+    pnrs = Pnr.query.order_by(Pnr.Creation_Date.desc()).all()
+    return render_template("pnrs/list.html", pnrs=pnrs)
+
+
+@dashboard_bp.route("/pnrs/new", methods=["GET", "POST"])
+def new_pnr():
+    form = PnrForm()
+
+    if form.validate_on_submit():
+        pnr = Pnr(
+            PNR_Code=form.PNR_Code.data,
+            Booking_Office_Code=form.Booking_Office_Code.data,
+            POS_Travel_Agent_ID=form.POS_Travel_Agent_ID.data or None,
+            POS_City_Code=form.POS_City_Code.data or None,
+            POS_User_Type=form.POS_User_Type.data or None,
+            source="manual",
+        )
+        db.session.add(pnr)
+        db.session.commit()
+        flash(f"PNR {pnr.PNR_Code} created.", "success")
+        return redirect(url_for("dashboard.list_pnrs"))
+
+    return render_template("pnrs/form.html", form=form, pnr=None)
+
+
+@dashboard_bp.route("/pnrs/<int:pnr_id>/edit", methods=["GET", "POST"])
+def edit_pnr(pnr_id):
+    pnr = db.session.get(Pnr, pnr_id)
+    if pnr is None:
+        abort(404)
+
+    form = PnrForm(obj=pnr)
+
+    if form.validate_on_submit():
+        pnr.PNR_Code = form.PNR_Code.data
+        pnr.Booking_Office_Code = form.Booking_Office_Code.data
+        pnr.POS_Travel_Agent_ID = form.POS_Travel_Agent_ID.data or None
+        pnr.POS_City_Code = form.POS_City_Code.data or None
+        pnr.POS_User_Type = form.POS_User_Type.data or None
+        # source deliberately untouched -- see InventoryAvailability
+        # for the same reasoning
+        db.session.commit()
+        flash(f"PNR {pnr.PNR_Code} updated.", "success")
+        return redirect(url_for("dashboard.list_pnrs"))
+
+    return render_template("pnrs/form.html", form=form, pnr=pnr)
+
+
+@dashboard_bp.post("/pnrs/<int:pnr_id>/delete")
+def delete_pnr(pnr_id):
+    pnr = db.session.get(Pnr, pnr_id)
+    if pnr is None:
+        abort(404)
+
+    db.session.delete(pnr)
+    db.session.commit()
+    flash(f"PNR {pnr.PNR_Code} deleted.", "success")
+    return redirect(url_for("dashboard.list_pnrs"))

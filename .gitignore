@@ -225,3 +225,6 @@ docker-compose.yml
 
 # ENV
 .env
+
+# WEB ASSETS
+static/

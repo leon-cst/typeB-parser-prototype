@@ -36,6 +36,7 @@ _TABLES = loader.load_all()
 # Each orchestrator takes raw Type B text and returns a frozen Pydantic message model
 _ORCHESTRATORS = {
     "BOOKING": parse_booking_message,
+    "TLR": parse_booking_message,
     "AVN": parse_availability_message,
     "RVR": parse_recap_message,
     "DVD": parse_dvd_message,
@@ -101,7 +102,7 @@ def parse_message():
         "data": message.model_dump(
             exclude={
                 "name_elements": True,
-                "passengers": {"__all__": {"passenger_type": True}}
+                "passengers": {"__all__": {}}
             }
         ),
         "detected_msg_id": envelope.effective_identifier,

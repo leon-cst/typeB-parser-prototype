@@ -7,9 +7,11 @@ from typeb.model.elements import (
     AutomatedSsrElement,
     NameChange,
     NameElement,
+    OsiElement,
     OsiOriginalLocatorElement,
     OsiPartyCountElement,
     SegmentElement,
+    SsrPassengerTypeFlagElement,
 )
 from typeb.model.envelope import Envelope
 from typeb.model.passenger import BookingPassenger
@@ -21,7 +23,8 @@ class DvdMessage(BaseModel):
     envelope: Envelope
     airline_record_locators: list[str]
     party_count_notices: list[OsiPartyCountElement] = []
-    automated_ssrs: list[AutomatedSsrElement] = []
+    automated_ssrs: list[AutomatedSsrElement | SsrPassengerTypeFlagElement] = []
+    osi_elements: list[OsiElement] = []
     passengers: list[BookingPassenger]
     name_elements: list[NameElement]
     name_changes: list[NameChange] = []

@@ -149,3 +149,23 @@ class FlightSegment(db.Model):
             f"<FlightSegment {self.Segment_ID} {self.Flight_Number} "
             f"{self.Flight_Date} {self.Boarding_Point}-{self.Off_Point}>"
         )
+
+
+class Osi(db.Model):
+    __tablename__ = "OSI"
+
+    OSI_ID = db.Column(db.Integer, primary_key=True, autoincrement=True)
+
+    PNR_ID = db.Column(
+        db.Integer,
+        db.ForeignKey("PNR.PNR_ID", ondelete="CASCADE", onupdate="CASCADE"),
+        nullable=False,
+    )
+
+    Airline_Code = db.Column(db.String(3), nullable=False)
+    Information_Text = db.Column(db.String(255), nullable=False)
+
+    pnr = db.relationship("Pnr", backref=db.backref("osi_entries", cascade="all, delete-orphan"))
+
+    def __repr__(self) -> str:
+        return f"<Osi {self.OSI_ID} {self.Airline_Code!r}>"

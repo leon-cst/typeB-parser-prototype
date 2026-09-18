@@ -235,3 +235,25 @@ class FlightSegmentForm(FlaskForm):
         validators=[Optional()],
         filters=[lambda v: v.strip() if v else v],
     )
+
+
+
+class OsiForm(FlaskForm):
+    PNR_ID = SelectField(
+        "PNR",
+        validators=[DataRequired()],
+        coerce=int,
+        choices=[],
+    )
+
+    Airline_Code = StringField(
+        "Airline Code",
+        validators=[DataRequired(), Length(min=2, max=3)],
+        filters=[lambda v: v.strip().upper() if v else v],
+    )
+
+    Information_Text = StringField(
+        "Information Text",
+        validators=[DataRequired(), Length(max=255)],
+        filters=[lambda v: v.strip() if v else v],
+    )

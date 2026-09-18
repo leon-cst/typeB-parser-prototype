@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block title %}{{ "Edit" if entry else "New" }} OSI Entry{% endblock %}
+{% block page_heading %}{{ "Edit" if entry else "New" }} OSI Entry{% endblock %}
+{% block breadcrumb_current %}{{ "Edit" if entry else "New" }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-xl-6">
+        <div class="card">
+            <div class="card-body">
+
+                <h4 class="card-title mb-4">
+                    {{ "Edit" if entry else "New" }} OSI Entry
+                    {% if entry %}<small class="text-muted">#{{ entry.OSI_ID }}</small>{% endif %}
+                </h4>
+
+                <form method="post">
+                    {{ form.hidden_tag() }}
+
+                    <div class="mb-3 row">
+                        <label class="col-md-3 col-form-label">PNR</label>
+                        <div class="col-md-9">
+                            {{ form.PNR_ID(class="form-select" + (" is-invalid" if form.PNR_ID.errors else "")) }}
+                            {% for error in form.PNR_ID.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="mb-3 row">
+                        <label class="col-md-3 col-form-label">Airline Code</label>
+                        <div class="col-md-9">
+                            {{ form.Airline_Code(class="form-control" + (" is-invalid" if form.Airline_Code.errors else ""), maxlength=3) }}
+                            {% for error in form.Airline_Code.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="mb-3 row">
+                        <label class="col-md-3 col-form-label">Information Text</label>
+                        <div class="col-md-9">
+                            {{ form.Information_Text(class="form-control" + (" is-invalid" if form.Information_Text.errors else "")) }}
+                            {% for error in form.Information_Text.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-9 offset-md-3">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bx bx-save me-1"></i> Save
+                            </button>
+                            <a href="{{ url_for('dashboard.list_osi') }}" class="btn btn-secondary">
+                                Cancel
+                            </a>
+                        </div>
+                    </div>
+
+                </form>
+
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

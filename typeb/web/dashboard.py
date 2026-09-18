@@ -5,8 +5,8 @@ Agreement Table CRUD GUI.
 from flask import Blueprint, abort, flash, redirect, render_template, url_for
 
 from typeb.extensions import db
-from typeb.db.models import Agreement, MessageIdentifier, InventoryAvailability, Pnr, Passenger, FlightSegment
-from typeb.web.forms import AgreementForm, MessageIdentifierForm, InventoryAvailabilityForm, PnrForm, PassengerForm, FlightSegmentForm
+from typeb.db.models import Agreement, MessageIdentifier, InventoryAvailability, Pnr, Passenger, FlightSegment, Osi
+from typeb.web.forms import AgreementForm, MessageIdentifierForm, InventoryAvailabilityForm, PnrForm, PassengerForm, FlightSegmentForm, OsiForm
 from typeb.tables import loader
 from datetime import date
 
@@ -479,3 +479,65 @@ def delete_segment(segment_id):
     db.session.commit()
     flash(f"Flight segment {segment.Flight_Number} deleted.", "success")
     return redirect(url_for("dashboard.list_segments"))
+
+
+
+@dashboard_bp.get("/osi/")
+def list_osi():
+    entries = Osi.query.order_by(Osi.OSI_ID.desc()).all()
+    return render_template("osi/list.html", entries=entries)
+
+
+@dashboard_bp.route("/osi/new", methods=["GET", "POST"])
+def new_osi():
+    form = OsiForm()
+    form.PNR_ID.choices = _pnr_choices()
+
+    if not form.PNR_ID.choices:
+        flash("Create a PNR first before adding OSI entries.", "danger")
+        return redirect(url_for("dashboard.list_pnrs"))
+
+    if form.validate_on_submit():
+        entry = Osi(
+            PNR_ID=form.PNR_ID.data,
+            Airline_Code=form.Airline_Code.data,
+            Information_Text=form.Information_Text.data,
+        )
+        db.session.add(entry)
+        db.session.commit()
+        flash(f"OSI entry for {entry.Airline_Code} created.", "success")
+        return redirect(url_for("dashboard.list_osi"))
+
+    return render_template("osi/form.html", form=form, entry=None)
+
+
+@dashboard_bp.route("/osi/<int:osi_id>/edit", methods=["GET", "POST"])
+def edit_osi(osi_id):
+    entry = db.session.get(Osi, osi_id)
+    if entry is None:
+        abort(404)
+
+    form = OsiForm(obj=entry)
+    form.PNR_ID.choices = _pnr_choices()
+
+    if form.validate_on_submit():
+        entry.PNR_ID = form.PNR_ID.data
+        entry.Airline_Code = form.Airline_Code.data
+        entry.Information_Text = form.Information_Text.data
+        db.session.commit()
+        flash(f"OSI entry for {entry.Airline_Code} updated.", "success")
+        return redirect(url_for("dashboard.list_osi"))
+
+    return render_template("osi/form.html", form=form, entry=entry)
+
+
+@dashboard_bp.post("/osi/<int:osi_id>/delete")
+def delete_osi(osi_id):
+    entry = db.session.get(Osi, osi_id)
+    if entry is None:
+        abort(404)
+
+    db.session.delete(entry)
+    db.session.commit()
+    flash("OSI entry deleted.", "success")
+    return redirect(url_for("dashboard.list_osi"))

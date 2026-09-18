@@ -144,3 +144,36 @@ class PnrForm(FlaskForm):
         validators=[Optional(), Length(max=5)],
         filters=[lambda v: v.strip().upper() if v else v],
     )
+
+
+class PassengerForm(FlaskForm):
+    PNR_ID = SelectField(
+        "PNR",
+        validators=[DataRequired()],
+        coerce=int,
+        choices=[],  # populated in the route from real PNR rows
+    )
+
+    Family_Name = StringField(
+        "Family Name",
+        validators=[DataRequired(), Length(max=50)],
+        filters=[lambda v: v.strip().upper() if v else v],
+    )
+
+    First_Name_Middle_Name = StringField(
+        "First / Middle Name",
+        validators=[Optional(), Length(max=100)],
+        filters=[lambda v: v.strip().upper() if v else v],
+    )
+
+    Title = StringField(
+        "Title",
+        validators=[Optional(), Length(max=10)],
+        filters=[lambda v: v.strip().upper() if v else v],
+    )
+
+    Number_In_Party = StringField(
+        "Number in Party",
+        validators=[Optional()],
+        filters=[lambda v: v.strip() if v else v],
+    )

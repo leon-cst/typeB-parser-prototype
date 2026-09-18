@@ -1,16 +1,12 @@
 """
 Agreement Table CRUD GUI.
 
-Plain HTML for now (no Skote styling yet). Soft-delete only: the
-"delete" route flips is_active to False rather than removing the row,
-since this is a config table that affects reply generation and past
-state is worth keeping.
 """
 from flask import Blueprint, abort, flash, redirect, render_template, url_for
 
 from typeb.extensions import db
-from typeb.db.models import Agreement, MessageIdentifier, InventoryAvailability, Pnr
-from typeb.web.forms import AgreementForm, MessageIdentifierForm, InventoryAvailabilityForm, PnrForm
+from typeb.db.models import Agreement, MessageIdentifier, InventoryAvailability, Pnr, Passenger
+from typeb.web.forms import AgreementForm, MessageIdentifierForm, InventoryAvailabilityForm, PnrForm, PassengerForm
 from typeb.tables import loader
 from datetime import date
 
@@ -287,3 +283,89 @@ def delete_pnr(pnr_id):
     db.session.commit()
     flash(f"PNR {pnr.PNR_Code} deleted.", "success")
     return redirect(url_for("dashboard.list_pnrs"))
+
+
+def _pnr_choices():
+    pnrs = Pnr.query.order_by(Pnr.PNR_Code).all()
+    return [(p.PNR_ID, f"{p.PNR_Code} (#{p.PNR_ID})") for p in pnrs]
+
+
+@dashboard_bp.get("/passengers/")
+def list_passengers():
+    passengers = Passenger.query.order_by(Passenger.Family_Name).all()
+    return render_template("passengers/list.html", passengers=passengers)
+
+
+@dashboard_bp.route("/passengers/new", methods=["GET", "POST"])
+def new_passenger():
+    form = PassengerForm()
+    form.PNR_ID.choices = _pnr_choices()
+
+    if not form.PNR_ID.choices:
+        flash("Create a PNR first before adding passengers.", "danger")
+        return redirect(url_for("dashboard.list_pnrs"))
+
+    if form.validate_on_submit():
+        number_in_party = None
+        if form.Number_In_Party.data:
+            try:
+                number_in_party = int(form.Number_In_Party.data)
+            except ValueError:
+                form.Number_In_Party.errors.append("Must be a whole number.")
+                return render_template("passengers/form.html", form=form, passenger=None)
+
+        passenger = Passenger(
+            PNR_ID=form.PNR_ID.data,
+            Family_Name=form.Family_Name.data,
+            First_Name_Middle_Name=form.First_Name_Middle_Name.data or None,
+            Title=form.Title.data or None,
+            Number_In_Party=number_in_party,
+        )
+        db.session.add(passenger)
+        db.session.commit()
+        flash(f"Passenger {passenger.Family_Name} created.", "success")
+        return redirect(url_for("dashboard.list_passengers"))
+
+    return render_template("passengers/form.html", form=form, passenger=None)
+
+
+@dashboard_bp.route("/passengers/<int:passenger_id>/edit", methods=["GET", "POST"])
+def edit_passenger(passenger_id):
+    passenger = db.session.get(Passenger, passenger_id)
+    if passenger is None:
+        abort(404)
+
+    form = PassengerForm(obj=passenger)
+    form.PNR_ID.choices = _pnr_choices()
+
+    if form.validate_on_submit():
+        number_in_party = None
+        if form.Number_In_Party.data:
+            try:
+                number_in_party = int(form.Number_In_Party.data)
+            except ValueError:
+                form.Number_In_Party.errors.append("Must be a whole number.")
+                return render_template("passengers/form.html", form=form, passenger=passenger)
+
+        passenger.PNR_ID = form.PNR_ID.data
+        passenger.Family_Name = form.Family_Name.data
+        passenger.First_Name_Middle_Name = form.First_Name_Middle_Name.data or None
+        passenger.Title = form.Title.data or None
+        passenger.Number_In_Party = number_in_party
+        db.session.commit()
+        flash(f"Passenger {passenger.Family_Name} updated.", "success")
+        return redirect(url_for("dashboard.list_passengers"))
+
+    return render_template("passengers/form.html", form=form, passenger=passenger)
+
+
+@dashboard_bp.post("/passengers/<int:passenger_id>/delete")
+def delete_passenger(passenger_id):
+    passenger = db.session.get(Passenger, passenger_id)
+    if passenger is None:
+        abort(404)
+
+    db.session.delete(passenger)
+    db.session.commit()
+    flash(f"Passenger {passenger.Family_Name} deleted.", "success")
+    return redirect(url_for("dashboard.list_passengers"))

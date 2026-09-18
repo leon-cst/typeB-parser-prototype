@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block title %}{{ "Edit" if passenger else "New" }} Passenger{% endblock %}
+{% block page_heading %}{{ "Edit" if passenger else "New" }} Passenger{% endblock %}
+{% block breadcrumb_current %}{{ "Edit" if passenger else "New" }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-xl-6">
+        <div class="card">
+            <div class="card-body">
+
+                <h4 class="card-title mb-4">
+                    {{ "Edit" if passenger else "New" }} Passenger
+                    {% if passenger %}<small class="text-muted">#{{ passenger.Passenger_ID }}</small>{% endif %}
+                </h4>
+
+                <form method="post">
+                    {{ form.hidden_tag() }}
+
+                    <div class="mb-3 row">
+                        <label class="col-md-3 col-form-label">PNR</label>
+                        <div class="col-md-9">
+                            {{ form.PNR_ID(class="form-select" + (" is-invalid" if form.PNR_ID.errors else "")) }}
+                            {% for error in form.PNR_ID.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="mb-3 row">
+                        <label class="col-md-3 col-form-label">Family Name</label>
+                        <div class="col-md-9">
+                            {{ form.Family_Name(class="form-control" + (" is-invalid" if form.Family_Name.errors else "")) }}
+                            {% for error in form.Family_Name.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="mb-3 row">
+                        <label class="col-md-3 col-form-label">First / Middle Name</label>
+                        <div class="col-md-9">
+                            {{ form.First_Name_Middle_Name(class="form-control" + (" is-invalid" if form.First_Name_Middle_Name.errors else "")) }}
+                            {% for error in form.First_Name_Middle_Name.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="mb-3 row">
+                        <label class="col-md-3 col-form-label">Title</label>
+                        <div class="col-md-9">
+                            {{ form.Title(class="form-control" + (" is-invalid" if form.Title.errors else "")) }}
+                            {% for error in form.Title.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="mb-3 row">
+                        <label class="col-md-3 col-form-label">Number in Party</label>
+                        <div class="col-md-9">
+                            {{ form.Number_In_Party(class="form-control" + (" is-invalid" if form.Number_In_Party.errors else "")) }}
+                            {% for error in form.Number_In_Party.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-9 offset-md-3">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bx bx-save me-1"></i> Save
+                            </button>
+                            <a href="{{ url_for('dashboard.list_passengers') }}" class="btn btn-secondary">
+                                Cancel
+                            </a>
+                        </div>
+                    </div>
+
+                </form>
+
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

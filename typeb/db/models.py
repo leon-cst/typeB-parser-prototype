@@ -97,3 +97,26 @@ class Pnr(db.Model):
 
     def __repr__(self) -> str:
         return f"<Pnr {self.PNR_ID} code={self.PNR_Code!r}>"
+
+
+class Passenger(db.Model):
+    __tablename__ = "PASSENGER"
+
+    Passenger_ID = db.Column(db.Integer, primary_key=True, autoincrement=True)
+
+    # FKs PNR_ID, not PNR_Code -- PNR_Code isn't unique (see Pnr model).
+    PNR_ID = db.Column(
+        db.Integer,
+        db.ForeignKey("PNR.PNR_ID", ondelete="CASCADE", onupdate="CASCADE"),
+        nullable=False,
+    )
+
+    Family_Name = db.Column(db.String(50), nullable=False)
+    First_Name_Middle_Name = db.Column(db.String(100), nullable=True)
+    Title = db.Column(db.String(10), nullable=True)
+    Number_In_Party = db.Column(db.Integer, nullable=True)
+
+    pnr = db.relationship("Pnr", backref=db.backref("passengers", cascade="all, delete-orphan"))
+
+    def __repr__(self) -> str:
+        return f"<Passenger {self.Passenger_ID} {self.Family_Name!r}>"

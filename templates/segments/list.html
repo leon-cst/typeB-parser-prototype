@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% block title %}Flight Segments{% endblock %}
+{% block page_heading %}Flight Segments{% endblock %}
+{% block breadcrumb_current %}Segments{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h4 class="card-title mb-0">Flight Segments</h4>
+                    <a href="{{ url_for('dashboard.new_segment') }}" class="btn btn-primary">
+                        <i class="bx bx-plus me-1"></i> New Segment
+                    </a>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-bordered mb-0">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>PNR</th>
+                                <th>Flight</th>
+                                <th>Class</th>
+                                <th>Date</th>
+                                <th>Route</th>
+                                <th>Action</th>
+                                <th>Dep / Arr</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for s in segments %}
+                            <tr>
+                                <td>{{ s.Segment_ID }}</td>
+                                <td><code>{{ s.pnr.PNR_Code }}</code></td>
+                                <td>{{ s.Flight_Number }}</td>
+                                <td>{{ s.RBD_Class or "—" }}</td>
+                                <td>{{ s.Flight_Date.strftime("%Y-%m-%d") }}</td>
+                                <td>{{ s.Boarding_Point }}–{{ s.Off_Point }}</td>
+                                <td>{{ s.Action_Code or "—" }}</td>
+                                <td>
+                                    {{ s.Departure_Time.strftime("%H:%M") if s.Departure_Time else "—" }}
+                                    /
+                                    {{ s.Arrival_Time.strftime("%H:%M") if s.Arrival_Time else "—" }}
+                                </td>
+                                <td>
+                                    <a href="{{ url_for('dashboard.edit_segment', segment_id=s.Segment_ID) }}"
+                                       class="btn btn-sm btn-soft-info me-1">
+                                        <i class="bx bx-edit"></i> Edit
+                                    </a>
+                                    <form action="{{ url_for('dashboard.delete_segment', segment_id=s.Segment_ID) }}"
+                                          method="post" style="display:inline"
+                                          onsubmit="return confirm('Delete this flight segment?');">
+                                        <button type="submit" class="btn btn-sm btn-soft-danger">
+                                            <i class="bx bx-trash"></i> Delete
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="9" class="text-center text-muted">No flight segments yet.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

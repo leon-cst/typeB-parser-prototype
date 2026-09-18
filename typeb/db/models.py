@@ -120,3 +120,32 @@ class Passenger(db.Model):
 
     def __repr__(self) -> str:
         return f"<Passenger {self.Passenger_ID} {self.Family_Name!r}>"
+
+
+class FlightSegment(db.Model):
+    __tablename__ = "FLIGHT_SEGMENT"
+
+    Segment_ID = db.Column(db.Integer, primary_key=True, autoincrement=True)
+
+    PNR_ID = db.Column(
+        db.Integer,
+        db.ForeignKey("PNR.PNR_ID", ondelete="CASCADE", onupdate="CASCADE"),
+        nullable=False,
+    )
+
+    Flight_Number = db.Column(db.String(10), nullable=False)
+    RBD_Class = db.Column(db.String(1), nullable=True)
+    Flight_Date = db.Column(db.Date, nullable=False)
+    Boarding_Point = db.Column(db.String(3), nullable=False)
+    Off_Point = db.Column(db.String(3), nullable=False)
+    Action_Code = db.Column(db.String(2), nullable=True)
+    Departure_Time = db.Column(db.Time, nullable=True)
+    Arrival_Time = db.Column(db.Time, nullable=True)
+
+    pnr = db.relationship("Pnr", backref=db.backref("flight_segments", cascade="all, delete-orphan"))
+
+    def __repr__(self) -> str:
+        return (
+            f"<FlightSegment {self.Segment_ID} {self.Flight_Number} "
+            f"{self.Flight_Date} {self.Boarding_Point}-{self.Off_Point}>"
+        )

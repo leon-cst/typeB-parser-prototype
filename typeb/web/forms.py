@@ -177,3 +177,61 @@ class PassengerForm(FlaskForm):
         validators=[Optional()],
         filters=[lambda v: v.strip() if v else v],
     )
+
+
+
+class FlightSegmentForm(FlaskForm):
+    PNR_ID = SelectField(
+        "PNR",
+        validators=[DataRequired()],
+        coerce=int,
+        choices=[],
+    )
+
+    Flight_Number = StringField(
+        "Flight Number",
+        validators=[DataRequired(), Length(max=10)],
+        filters=[lambda v: v.strip().upper() if v else v],
+    )
+
+    RBD_Class = StringField(
+        "RBD Class",
+        validators=[Optional(), Length(min=1, max=1)],
+        filters=[lambda v: v.strip().upper() if v else v],
+    )
+
+    Flight_Date = StringField(
+        "Flight Date (YYYY-MM-DD)",
+        validators=[DataRequired()],
+        filters=[lambda v: v.strip() if v else v],
+    )
+
+    Boarding_Point = StringField(
+        "Boarding Point",
+        validators=[DataRequired(), Length(min=3, max=3)],
+        filters=[lambda v: v.strip().upper() if v else v],
+    )
+
+    Off_Point = StringField(
+        "Off Point",
+        validators=[DataRequired(), Length(min=3, max=3)],
+        filters=[lambda v: v.strip().upper() if v else v],
+    )
+
+    Action_Code = StringField(
+        "Action Code",
+        validators=[Optional(), Length(min=2, max=2)],
+        filters=[lambda v: v.strip().upper() if v else v],
+    )
+
+    Departure_Time = StringField(
+        "Departure Time (HH:MM)",
+        validators=[Optional()],
+        filters=[lambda v: v.strip() if v else v],
+    )
+
+    Arrival_Time = StringField(
+        "Arrival Time (HH:MM)",
+        validators=[Optional()],
+        filters=[lambda v: v.strip() if v else v],
+    )

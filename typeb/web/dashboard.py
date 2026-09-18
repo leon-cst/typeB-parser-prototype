@@ -5,8 +5,8 @@ Agreement Table CRUD GUI.
 from flask import Blueprint, abort, flash, redirect, render_template, url_for
 
 from typeb.extensions import db
-from typeb.db.models import Agreement, MessageIdentifier, InventoryAvailability, Pnr, Passenger
-from typeb.web.forms import AgreementForm, MessageIdentifierForm, InventoryAvailabilityForm, PnrForm, PassengerForm
+from typeb.db.models import Agreement, MessageIdentifier, InventoryAvailability, Pnr, Passenger, FlightSegment
+from typeb.web.forms import AgreementForm, MessageIdentifierForm, InventoryAvailabilityForm, PnrForm, PassengerForm, FlightSegmentForm
 from typeb.tables import loader
 from datetime import date
 
@@ -369,3 +369,113 @@ def delete_passenger(passenger_id):
     db.session.commit()
     flash(f"Passenger {passenger.Family_Name} deleted.", "success")
     return redirect(url_for("dashboard.list_passengers"))
+
+
+def _parse_optional_time(raw: str | None):
+    if not raw:
+        return None
+    return time.fromisoformat(raw)
+
+
+@dashboard_bp.get("/segments/")
+def list_segments():
+    segments = FlightSegment.query.order_by(FlightSegment.Flight_Date).all()
+    return render_template("segments/list.html", segments=segments)
+
+
+@dashboard_bp.route("/segments/new", methods=["GET", "POST"])
+def new_segment():
+    form = FlightSegmentForm()
+    form.PNR_ID.choices = _pnr_choices()
+
+    if not form.PNR_ID.choices:
+        flash("Create a PNR first before adding flight segments.", "danger")
+        return redirect(url_for("dashboard.list_pnrs"))
+
+    if form.validate_on_submit():
+        try:
+            flight_date = date.fromisoformat(form.Flight_Date.data)
+        except ValueError:
+            form.Flight_Date.errors.append("Expected format YYYY-MM-DD.")
+            return render_template("segments/form.html", form=form, segment=None)
+
+        try:
+            departure_time = _parse_optional_time(form.Departure_Time.data)
+            arrival_time = _parse_optional_time(form.Arrival_Time.data)
+        except ValueError:
+            form.Departure_Time.errors.append("Expected format HH:MM.")
+            return render_template("segments/form.html", form=form, segment=None)
+
+        segment = FlightSegment(
+            PNR_ID=form.PNR_ID.data,
+            Flight_Number=form.Flight_Number.data,
+            RBD_Class=form.RBD_Class.data or None,
+            Flight_Date=flight_date,
+            Boarding_Point=form.Boarding_Point.data,
+            Off_Point=form.Off_Point.data,
+            Action_Code=form.Action_Code.data or None,
+            Departure_Time=departure_time,
+            Arrival_Time=arrival_time,
+        )
+        db.session.add(segment)
+        db.session.commit()
+        flash(f"Flight segment {segment.Flight_Number} created.", "success")
+        return redirect(url_for("dashboard.list_segments"))
+
+    return render_template("segments/form.html", form=form, segment=None)
+
+
+@dashboard_bp.route("/segments/<int:segment_id>/edit", methods=["GET", "POST"])
+def edit_segment(segment_id):
+    segment = db.session.get(FlightSegment, segment_id)
+    if segment is None:
+        abort(404)
+
+    form = FlightSegmentForm(
+        obj=segment,
+        Flight_Date=segment.Flight_Date.isoformat(),
+        Departure_Time=segment.Departure_Time.isoformat(timespec="minutes") if segment.Departure_Time else "",
+        Arrival_Time=segment.Arrival_Time.isoformat(timespec="minutes") if segment.Arrival_Time else "",
+    )
+    form.PNR_ID.choices = _pnr_choices()
+
+    if form.validate_on_submit():
+        try:
+            flight_date = date.fromisoformat(form.Flight_Date.data)
+        except ValueError:
+            form.Flight_Date.errors.append("Expected format YYYY-MM-DD.")
+            return render_template("segments/form.html", form=form, segment=segment)
+
+        try:
+            departure_time = _parse_optional_time(form.Departure_Time.data)
+            arrival_time = _parse_optional_time(form.Arrival_Time.data)
+        except ValueError:
+            form.Departure_Time.errors.append("Expected format HH:MM.")
+            return render_template("segments/form.html", form=form, segment=segment)
+
+        segment.PNR_ID = form.PNR_ID.data
+        segment.Flight_Number = form.Flight_Number.data
+        segment.RBD_Class = form.RBD_Class.data or None
+        segment.Flight_Date = flight_date
+        segment.Boarding_Point = form.Boarding_Point.data
+        segment.Off_Point = form.Off_Point.data
+        segment.Action_Code = form.Action_Code.data or None
+        segment.Departure_Time = departure_time
+        segment.Arrival_Time = arrival_time
+        db.session.commit()
+        flash(f"Flight segment {segment.Flight_Number} updated.", "success")
+        return redirect(url_for("dashboard.list_segments"))
+
+    return render_template("segments/form.html", form=form, segment=segment)
+
+
+@dashboard_bp.post("/segments/<int:segment_id>/delete")
+def delete_segment(segment_id):
+    segment = db.session.get(FlightSegment, segment_id)
+    if segment is None:
+        abort(404)
+
+    db.session.delete(segment)
+    db.session.commit()
+    flash(f"Flight segment {segment.Flight_Number} deleted.", "success")
+    return redirect(url_for("dashboard.list_segments"))

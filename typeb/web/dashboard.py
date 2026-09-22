@@ -5,8 +5,8 @@ Agreement Table CRUD GUI.
 from flask import Blueprint, abort, flash, redirect, render_template, url_for
 
 from typeb.extensions import db
-from typeb.db.models import Agreement, MessageIdentifier, InventoryAvailability, Pnr, Passenger, FlightSegment, Osi
-from typeb.web.forms import AgreementForm, MessageIdentifierForm, InventoryAvailabilityForm, PnrForm, PassengerForm, FlightSegmentForm, OsiForm
+from typeb.db.models import Agreement, MessageIdentifier, InventoryAvailability, Pnr, Passenger, FlightSegment, Osi, Ssr
+from typeb.web.forms import AgreementForm, MessageIdentifierForm, InventoryAvailabilityForm, PnrForm, PassengerForm, FlightSegmentForm, OsiForm, SsrForm
 from typeb.tables import loader
 from datetime import date
 
@@ -541,3 +541,97 @@ def delete_osi(osi_id):
     db.session.commit()
     flash("OSI entry deleted.", "success")
     return redirect(url_for("dashboard.list_osi"))
+
+
+def _passenger_choices():
+    passengers = Passenger.query.order_by(Passenger.Family_Name).all()
+    choices = [(0, "-- none --")]
+    choices += [(p.Passenger_ID, f"{p.Family_Name} (#{p.Passenger_ID})") for p in passengers]
+    return choices
+
+
+def _segment_choices():
+    segments = FlightSegment.query.order_by(FlightSegment.Flight_Date).all()
+    choices = [(0, "-- none --")]
+    choices += [
+        (s.Segment_ID, f"{s.Flight_Number} {s.Flight_Date} (#{s.Segment_ID})")
+        for s in segments
+    ]
+    return choices
+
+
+@dashboard_bp.get("/ssr/")
+def list_ssr():
+    entries = Ssr.query.order_by(Ssr.SSR_ID.desc()).all()
+    return render_template("ssr/list.html", entries=entries)
+
+
+@dashboard_bp.route("/ssr/new", methods=["GET", "POST"])
+def new_ssr():
+    form = SsrForm()
+    form.PNR_ID.choices = _pnr_choices()
+    form.Passenger_ID.choices = _passenger_choices()
+    form.Segment_ID.choices = _segment_choices()
+
+    if not form.PNR_ID.choices:
+        flash("Create a PNR first before adding SSR entries.", "danger")
+        return redirect(url_for("dashboard.list_pnrs"))
+
+    if form.validate_on_submit():
+        entry = Ssr(
+            PNR_ID=form.PNR_ID.data,
+            Passenger_ID=form.Passenger_ID.data or None,
+            Segment_ID=form.Segment_ID.data or None,
+            SSR_Code=form.SSR_Code.data,
+            Airline_Code=form.Airline_Code.data or None,
+            Action_Code=form.Action_Code.data or None,
+            Free_Text=form.Free_Text.data or None,
+        )
+        db.session.add(entry)
+        db.session.commit()
+        flash(f"SSR entry {entry.SSR_Code} created.", "success")
+        return redirect(url_for("dashboard.list_ssr"))
+
+    return render_template("ssr/form.html", form=form, entry=None)
+
+
+@dashboard_bp.route("/ssr/<int:ssr_id>/edit", methods=["GET", "POST"])
+def edit_ssr(ssr_id):
+    entry = db.session.get(Ssr, ssr_id)
+    if entry is None:
+        abort(404)
+
+    form = SsrForm(
+        obj=entry,
+        Passenger_ID=entry.Passenger_ID or 0,
+        Segment_ID=entry.Segment_ID or 0,
+    )
+    form.PNR_ID.choices = _pnr_choices()
+    form.Passenger_ID.choices = _passenger_choices()
+    form.Segment_ID.choices = _segment_choices()
+
+    if form.validate_on_submit():
+        entry.PNR_ID = form.PNR_ID.data
+        entry.Passenger_ID = form.Passenger_ID.data or None
+        entry.Segment_ID = form.Segment_ID.data or None
+        entry.SSR_Code = form.SSR_Code.data
+        entry.Airline_Code = form.Airline_Code.data or None
+        entry.Action_Code = form.Action_Code.data or None
+        entry.Free_Text = form.Free_Text.data or None
+        db.session.commit()
+        flash(f"SSR entry {entry.SSR_Code} updated.", "success")
+        return redirect(url_for("dashboard.list_ssr"))
+
+    return render_template("ssr/form.html", form=form, entry=entry)
+
+
+@dashboard_bp.post("/ssr/<int:ssr_id>/delete")
+def delete_ssr(ssr_id):
+    entry = db.session.get(Ssr, ssr_id)
+    if entry is None:
+        abort(404)
+
+    db.session.delete(entry)
+    db.session.commit()
+    flash(f"SSR entry {entry.SSR_Code} deleted.", "success")
+    return redirect(url_for("dashboard.list_ssr"))

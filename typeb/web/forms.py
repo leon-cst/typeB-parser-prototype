@@ -257,3 +257,50 @@ class OsiForm(FlaskForm):
         validators=[DataRequired(), Length(max=255)],
         filters=[lambda v: v.strip() if v else v],
     )
+
+
+class SsrForm(FlaskForm):
+    PNR_ID = SelectField(
+        "PNR",
+        validators=[DataRequired()],
+        coerce=int,
+        choices=[],
+    )
+
+    Passenger_ID = SelectField(
+        "Passenger (optional)",
+        validators=[Optional()],
+        coerce=int,
+        choices=[],
+    )
+
+    Segment_ID = SelectField(
+        "Flight Segment (optional)",
+        validators=[Optional()],
+        coerce=int,
+        choices=[],
+    )
+
+    SSR_Code = StringField(
+        "SSR Code",
+        validators=[DataRequired(), Length(min=4, max=4)],
+        filters=[lambda v: v.strip().upper() if v else v],
+    )
+
+    Airline_Code = StringField(
+        "Airline Code",
+        validators=[Optional(), Length(min=2, max=3)],
+        filters=[lambda v: v.strip().upper() if v else v],
+    )
+
+    Action_Code = StringField(
+        "Action Code",
+        validators=[Optional(), Length(min=2, max=2)],
+        filters=[lambda v: v.strip().upper() if v else v],
+    )
+
+    Free_Text = StringField(
+        "Free Text",
+        validators=[Optional(), Length(max=255)],
+        filters=[lambda v: v.strip() if v else v],
+    )

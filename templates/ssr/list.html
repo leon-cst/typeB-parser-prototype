@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block title %}SSR Entries{% endblock %}
+{% block page_heading %}SSR Entries{% endblock %}
+{% block breadcrumb_current %}SSR{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h4 class="card-title mb-0">SSR Entries</h4>
+                    <a href="{{ url_for('dashboard.new_ssr') }}" class="btn btn-primary">
+                        <i class="bx bx-plus me-1"></i> New SSR Entry
+                    </a>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-bordered mb-0">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>PNR</th>
+                                <th>Passenger</th>
+                                <th>Segment</th>
+                                <th>SSR Code</th>
+                                <th>Airline</th>
+                                <th>Action</th>
+                                <th>Free Text</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for e in entries %}
+                            <tr>
+                                <td>{{ e.SSR_ID }}</td>
+                                <td><code>{{ e.pnr.PNR_Code }}</code></td>
+                                <td>{{ e.passenger.Family_Name if e.passenger else "—" }}</td>
+                                <td>{{ e.segment.Flight_Number if e.segment else "—" }}</td>
+                                <td><code>{{ e.SSR_Code }}</code></td>
+                                <td>{{ e.Airline_Code or "—" }}</td>
+                                <td>{{ e.Action_Code or "—" }}</td>
+                                <td>{{ e.Free_Text or "—" }}</td>
+                                <td>
+                                    <a href="{{ url_for('dashboard.edit_ssr', ssr_id=e.SSR_ID) }}"
+                                       class="btn btn-sm btn-soft-info me-1">
+                                        <i class="bx bx-edit"></i> Edit
+                                    </a>
+                                    <form action="{{ url_for('dashboard.delete_ssr', ssr_id=e.SSR_ID) }}"
+                                          method="post" style="display:inline"
+                                          onsubmit="return confirm('Delete this SSR entry?');">
+                                        <button type="submit" class="btn btn-sm btn-soft-danger">
+                                            <i class="bx bx-trash"></i> Delete
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="9" class="text-center text-muted">No SSR entries yet.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

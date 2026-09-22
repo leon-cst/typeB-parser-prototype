@@ -169,3 +169,39 @@ class Osi(db.Model):
 
     def __repr__(self) -> str:
         return f"<Osi {self.OSI_ID} {self.Airline_Code!r}>"
+
+
+class Ssr(db.Model):
+    __tablename__ = "SSR"
+
+    SSR_ID = db.Column(db.Integer, primary_key=True, autoincrement=True)
+
+    PNR_ID = db.Column(
+        db.Integer,
+        db.ForeignKey("PNR.PNR_ID", ondelete="CASCADE", onupdate="CASCADE"),
+        nullable=False,
+    )
+
+    Passenger_ID = db.Column(
+        db.Integer,
+        db.ForeignKey("PASSENGER.Passenger_ID", ondelete="SET NULL", onupdate="CASCADE"),
+        nullable=True,
+    )
+
+    Segment_ID = db.Column(
+        db.Integer,
+        db.ForeignKey("FLIGHT_SEGMENT.Segment_ID", ondelete="SET NULL", onupdate="CASCADE"),
+        nullable=True,
+    )
+
+    SSR_Code = db.Column(db.String(4), nullable=False)
+    Airline_Code = db.Column(db.String(3), nullable=True)
+    Action_Code = db.Column(db.String(2), nullable=True)
+    Free_Text = db.Column(db.String(255), nullable=True)
+
+    pnr = db.relationship("Pnr", backref=db.backref("ssr_entries", cascade="all, delete-orphan"))
+    passenger = db.relationship("Passenger", backref="ssr_entries")
+    segment = db.relationship("FlightSegment", backref="ssr_entries")
+
+    def __repr__(self) -> str:
+        return f"<Ssr {self.SSR_ID} {self.SSR_Code!r}>"

@@ -365,12 +365,19 @@ class OsiForm(FlaskForm):
         choices=[],
     )
 
+    Passenger_ID = SelectField(
+        "Passenger (optional)",
+        validators=[Optional()],
+        coerce=int,
+        choices=[],
+    )
+
     Airline_Code = StringField(
         "Airline Code",
         validators=[
             DataRequired(),
-            Length(min=2, max=2),
-            Regexp(_AIRLINE_CODE_RE, message="Expected exactly 2 uppercase letters, e.g. YY, BA"),
+            Length(min=2, max=3),
+            Regexp(_AIRLINE_CODE_RE, message="Expected 2-3 uppercase letters/digits, e.g. YY, 8G"),
         ],
         filters=[lambda v: v.strip().upper() if v else v],
     )
@@ -380,7 +387,7 @@ class OsiForm(FlaskForm):
         validators=[DataRequired(), Length(max=255)],
         filters=[lambda v: v.strip() if v else v],
     )
-
+    
 
 class SsrForm(FlaskForm):
     PNR_ID = SelectField(

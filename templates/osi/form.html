@@ -27,6 +27,13 @@
                     </div>
 
                     <div class="mb-3 row">
+                        <label class="col-md-3 col-form-label">Passenger</label>
+                        <div class="col-md-9">
+                            {{ form.Passenger_ID(class="form-select") }}
+                        </div>
+                    </div>
+
+                    <div class="mb-3 row">
                         <label class="col-md-3 col-form-label">Airline Code</label>
                         <div class="col-md-9">
                             {{ form.Airline_Code(class="form-control" + (" is-invalid" if form.Airline_Code.errors else ""), maxlength=3) }}

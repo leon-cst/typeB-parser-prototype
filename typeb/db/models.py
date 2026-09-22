@@ -171,10 +171,17 @@ class Osi(db.Model):
         nullable=False,
     )
 
+    Passenger_ID = db.Column(
+        db.Integer,
+        db.ForeignKey("PASSENGER.Passenger_ID", ondelete="SET NULL", onupdate="CASCADE"),
+        nullable=True,
+    )
+
     Airline_Code = db.Column(db.String(3), nullable=False)
     Information_Text = db.Column(db.String(255), nullable=False)
 
     pnr = db.relationship("Pnr", backref=db.backref("osi_entries", cascade="all, delete-orphan"))
+    passenger = db.relationship("Passenger", backref="osi_entries")
 
     def __repr__(self) -> str:
         return f"<Osi {self.OSI_ID} {self.Airline_Code!r}>"

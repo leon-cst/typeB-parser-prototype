@@ -535,6 +535,7 @@ def list_osi():
 def new_osi():
     form = OsiForm()
     form.PNR_ID.choices = _pnr_choices()
+    form.Passenger_ID.choices = _passenger_choices()
 
     if not form.PNR_ID.choices:
         flash("Create a PNR first before adding OSI entries.", "danger")
@@ -543,6 +544,7 @@ def new_osi():
     if form.validate_on_submit():
         entry = Osi(
             PNR_ID=form.PNR_ID.data,
+            Passenger_ID=form.Passenger_ID.data or None,
             Airline_Code=form.Airline_Code.data,
             Information_Text=form.Information_Text.data,
         )
@@ -560,11 +562,13 @@ def edit_osi(osi_id):
     if entry is None:
         abort(404)
 
-    form = OsiForm(obj=entry)
+    form = OsiForm(obj=entry, Passenger_ID=entry.Passenger_ID or 0)
     form.PNR_ID.choices = _pnr_choices()
+    form.Passenger_ID.choices = _passenger_choices()
 
     if form.validate_on_submit():
         entry.PNR_ID = form.PNR_ID.data
+        entry.Passenger_ID = form.Passenger_ID.data or None
         entry.Airline_Code = form.Airline_Code.data
         entry.Information_Text = form.Information_Text.data
         db.session.commit()

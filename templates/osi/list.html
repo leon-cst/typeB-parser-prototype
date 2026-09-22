@@ -23,6 +23,7 @@
                             <tr>
                                 <th>ID</th>
                                 <th>PNR</th>
+                                <th>Passenger</th>
                                 <th>Airline</th>
                                 <th>Information Text</th>
                                 <th>Actions</th>
@@ -33,6 +34,7 @@
                             <tr>
                                 <td>{{ e.OSI_ID }}</td>
                                 <td><code>{{ e.pnr.PNR_Code }}</code></td>
+                                <td>{{ e.passenger.Family_Name if e.passenger else "—" }}</td>
                                 <td>{{ e.Airline_Code }}</td>
                                 <td>{{ e.Information_Text }}</td>
                                 <td>
@@ -51,7 +53,7 @@
                             </tr>
                             {% else %}
                             <tr>
-                                <td colspan="5" class="text-center text-muted">No OSI entries yet.</td>
+                                <td colspan="6" class="text-center text-muted">No OSI entries yet.</td>
                             </tr>
                             {% endfor %}
                         </tbody>

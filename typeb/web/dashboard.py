@@ -387,6 +387,7 @@ def list_segments():
 def new_segment():
     form = FlightSegmentForm()
     form.PNR_ID.choices = _pnr_choices()
+    form.Action_Code.choices = _segment_status_choices()
 
     if not form.PNR_ID.choices:
         flash("Create a PNR first before adding flight segments.", "danger")
@@ -438,6 +439,7 @@ def edit_segment(segment_id):
         Arrival_Time=segment.Arrival_Time.isoformat(timespec="minutes") if segment.Arrival_Time else "",
     )
     form.PNR_ID.choices = _pnr_choices()
+    form.Action_Code.choices = _segment_status_choices()
 
     if form.validate_on_submit():
         try:
@@ -572,6 +574,7 @@ def new_ssr():
     form.PNR_ID.choices = _pnr_choices()
     form.Passenger_ID.choices = _passenger_choices()
     form.Segment_ID.choices = _segment_choices()
+    form.Action_Code.choices = _segment_status_choices()
 
     if not form.PNR_ID.choices:
         flash("Create a PNR first before adding SSR entries.", "danger")
@@ -609,6 +612,7 @@ def edit_ssr(ssr_id):
     form.PNR_ID.choices = _pnr_choices()
     form.Passenger_ID.choices = _passenger_choices()
     form.Segment_ID.choices = _segment_choices()
+    form.Action_Code.choices = _segment_status_choices()
 
     if form.validate_on_submit():
         entry.PNR_ID = form.PNR_ID.data

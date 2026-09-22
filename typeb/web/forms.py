@@ -1,20 +1,18 @@
 """
 WTForms definitions for the agreement-table CRUD GUI.
 
-Validation here is deliberately permissive on Response_Format_Option
-and Allowed_Dates until Parka confirms the valid value sets -- see
-typeb/db/models.py for the same caveat on those two columns.
 """
 import re
 
 from flask_wtf import FlaskForm
 from wtforms import BooleanField, StringField, SelectField
 from wtforms.validators import DataRequired, Length, Optional, Regexp, NumberRange
+from typeb.tables import loader
 
-# Loosely validates a comma-separated list of 3-letter IATA city/airport
-# codes, e.g. "CGK,SIN" or "CGK, SIN, DPS". Tighten once Parka confirms
-# the exact expected format for Allowed_Routes.
-_ROUTE_LIST_PATTERN = re.compile(r"^\s*[A-Za-z]{3}\s*(,\s*[A-Za-z]{3}\s*)*$")
+
+_RESPONSE_FORMAT_RE = re.compile(r"^[A-Z][A-Z0-9_]*$")
+_ALLOWED_DATES_RE = re.compile(r"^\d+_DAYS$")
+_ALLOWED_ROUTES_RE = re.compile(r"^(ALL|[A-Z]{3}(,\s*[A-Z]{3})*)$")
 
 
 class AgreementForm(FlaskForm):
@@ -26,14 +24,28 @@ class AgreementForm(FlaskForm):
 
     Response_Format_Option = StringField(
         "Response Format Option",
-        validators=[Optional(), Length(max=50)],
-        filters=[lambda v: v.strip() if v else v],
+        validators=[
+            Optional(),
+            Length(max=50),
+            Regexp(
+                _RESPONSE_FORMAT_RE,
+                message="Expected uppercase letters, digits, underscores, e.g. STANDARD_TTY",
+            ),
+        ],
+        filters=[lambda v: v.strip().upper() if v else v],
     )
 
     Allowed_Dates = StringField(
         "Allowed Dates",
-        validators=[Optional(), Length(max=50)],
-        filters=[lambda v: v.strip() if v else v],
+        validators=[
+            Optional(),
+            Length(max=50),
+            Regexp(
+                _ALLOWED_DATES_RE,
+                message="Expected format N_DAYS, e.g. 365_DAYS",
+            ),
+        ],
+        filters=[lambda v: v.strip().upper() if v else v],
     )
 
     Allowed_Routes = StringField(
@@ -42,11 +54,8 @@ class AgreementForm(FlaskForm):
             Optional(),
             Length(max=255),
             Regexp(
-                _ROUTE_LIST_PATTERN,
-                message=(
-                    "Expected comma-separated 3-letter city codes, "
-                    "e.g. CGK,SIN"
-                ),
+                _ALLOWED_ROUTES_RE,
+                message="Expected ALL or comma-separated 3-letter city codes, e.g. CGK,SIN",
             ),
         ],
         filters=[lambda v: v.strip().upper() if v else v],
@@ -113,6 +122,7 @@ class InventoryAvailabilityForm(FlaskForm):
         filters=[lambda v: v.strip().upper() if v else v],
     )
 
+_POS_USER_TYPE_RE = re.compile(r"^[A-Z]$")
 
 class PnrForm(FlaskForm):
     PNR_Code = StringField(
@@ -141,10 +151,15 @@ class PnrForm(FlaskForm):
 
     POS_User_Type = StringField(
         "POS User Type",
-        validators=[Optional(), Length(max=5)],
+        validators=[
+            Optional(),
+            Length(min=1, max=1),
+            Regexp(_POS_USER_TYPE_RE, message="Expected a single letter, e.g. T (Travel Agent) or A (Airline)"),
+        ],
         filters=[lambda v: v.strip().upper() if v else v],
     )
 
+_TITLE_RE = re.compile(r"^[A-Z]{2,4}$")
 
 class PassengerForm(FlaskForm):
     PNR_ID = SelectField(
@@ -168,7 +183,11 @@ class PassengerForm(FlaskForm):
 
     Title = StringField(
         "Title",
-        validators=[Optional(), Length(max=10)],
+        validators=[
+            Optional(),
+            Length(min=2, max=10),
+            Regexp(_TITLE_RE, message="Expected 2-4 uppercase letters, e.g. MR, MRS, DR"),
+        ],
         filters=[lambda v: v.strip().upper() if v else v],
     )
 
@@ -218,10 +237,10 @@ class FlightSegmentForm(FlaskForm):
         filters=[lambda v: v.strip().upper() if v else v],
     )
 
-    Action_Code = StringField(
+    Action_Code = SelectField(
         "Action Code",
-        validators=[Optional(), Length(min=2, max=2)],
-        filters=[lambda v: v.strip().upper() if v else v],
+        validators=[Optional()],
+        choices=[],  # populated in the route from segment_status_codes.yaml
     )
 
     Departure_Time = StringField(
@@ -236,7 +255,7 @@ class FlightSegmentForm(FlaskForm):
         filters=[lambda v: v.strip() if v else v],
     )
 
-
+_AIRLINE_CODE_RE = re.compile(r"^[A-Z]{2}$")
 
 class OsiForm(FlaskForm):
     PNR_ID = SelectField(
@@ -248,7 +267,11 @@ class OsiForm(FlaskForm):
 
     Airline_Code = StringField(
         "Airline Code",
-        validators=[DataRequired(), Length(min=2, max=3)],
+        validators=[
+            DataRequired(),
+            Length(min=2, max=2),
+            Regexp(_AIRLINE_CODE_RE, message="Expected exactly 2 uppercase letters, e.g. YY, BA"),
+        ],
         filters=[lambda v: v.strip().upper() if v else v],
     )
 
@@ -289,14 +312,18 @@ class SsrForm(FlaskForm):
 
     Airline_Code = StringField(
         "Airline Code",
-        validators=[Optional(), Length(min=2, max=3)],
+        validators=[
+            Optional(),
+            Length(min=2, max=2),
+            Regexp(_AIRLINE_CODE_RE, message="Expected exactly 2 uppercase letters, e.g. YY, BA"),
+        ],
         filters=[lambda v: v.strip().upper() if v else v],
     )
 
-    Action_Code = StringField(
+    Action_Code = SelectField(
         "Action Code",
-        validators=[Optional(), Length(min=2, max=2)],
-        filters=[lambda v: v.strip().upper() if v else v],
+        validators=[Optional()],
+        choices=[],  # populated in the route from segment_status_codes.yaml
     )
 
     Free_Text = StringField(

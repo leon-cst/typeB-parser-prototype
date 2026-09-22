@@ -59,8 +59,7 @@
                     <div class="mb-3 row">
                         <label class="col-md-3 col-form-label">Action Code</label>
                         <div class="col-md-9">
-                            {{ form.Action_Code(class="form-control" + (" is-invalid" if form.Action_Code.errors else ""), maxlength=2) }}
-                            {% for error in form.Action_Code.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                            {{ form.Action_Code(class="form-select") }}
                         </div>
                     </div>
 

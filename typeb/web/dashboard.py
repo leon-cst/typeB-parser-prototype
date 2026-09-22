@@ -310,8 +310,10 @@ def new_passenger():
         if form.Number_In_Party.data:
             try:
                 number_in_party = int(form.Number_In_Party.data)
+                if number_in_party < 1:
+                    raise ValueError
             except ValueError:
-                form.Number_In_Party.errors.append("Must be a whole number.")
+                form.Number_In_Party.errors.append("Must be a positive whole number.")
                 return render_template("passengers/form.html", form=form, passenger=None)
 
         passenger = Passenger(
@@ -343,9 +345,11 @@ def edit_passenger(passenger_id):
         if form.Number_In_Party.data:
             try:
                 number_in_party = int(form.Number_In_Party.data)
+                if number_in_party < 1:
+                    raise ValueError
             except ValueError:
-                form.Number_In_Party.errors.append("Must be a whole number.")
-                return render_template("passengers/form.html", form=form, passenger=passenger)
+                form.Number_In_Party.errors.append("Must be a positive whole number.")
+                return render_template("passengers/form.html", form=form, passenger=None)
 
         passenger.PNR_ID = form.PNR_ID.data
         passenger.Family_Name = form.Family_Name.data

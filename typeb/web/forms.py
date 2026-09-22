@@ -9,7 +9,14 @@ from wtforms import BooleanField, StringField, SelectField
 from wtforms.validators import DataRequired, Length, Optional, Regexp, NumberRange
 from typeb.tables import loader
 
-
+_PARTNER_CODE_RE = re.compile(r"^[A-Z0-9]{2,10}$")
+_FLIGHT_NUMBER_RE = re.compile(r"^[A-Z]{2}\d{3,4}$")
+_CITY_CODE_RE = re.compile(r"^[A-Z]{3}$")
+_RBD_CLASS_RE = re.compile(r"^[A-Z]$")
+_PNR_CODE_RE = re.compile(r"^[A-Z0-9]{5,10}$")
+_BOOKING_OFFICE_RE = re.compile(r"^[A-Z0-9]{3,10}$")
+_TRAVEL_AGENT_ID_RE = re.compile(r"^\d{1,20}$")
+_SSR_CODE_RE = re.compile(r"^[A-Z]{4}$")
 _RESPONSE_FORMAT_RE = re.compile(r"^[A-Z][A-Z0-9_]*$")
 _ALLOWED_DATES_RE = re.compile(r"^\d+_DAYS$")
 _ALLOWED_ROUTES_RE = re.compile(r"^(ALL|[A-Z]{3}(,\s*[A-Z]{3})*)$")
@@ -18,7 +25,11 @@ _ALLOWED_ROUTES_RE = re.compile(r"^(ALL|[A-Z]{3}(,\s*[A-Z]{3})*)$")
 class AgreementForm(FlaskForm):
     Partner_Code = StringField(
         "Partner Code",
-        validators=[DataRequired(), Length(max=10)],
+        validators=[
+            DataRequired(),
+            Length(max=10),
+            Regexp(_PARTNER_CODE_RE, message="Expected 2-10 uppercase letters/digits, e.g. 1A, 1G"),
+        ],
         filters=[lambda v: v.strip().upper() if v else v],
     )
 
@@ -81,7 +92,11 @@ class MessageIdentifierForm(FlaskForm):
 class InventoryAvailabilityForm(FlaskForm):
     Flight_Number = StringField(
         "Flight Number",
-        validators=[DataRequired(), Length(max=10)],
+        validators=[
+            DataRequired(),
+            Length(max=10),
+            Regexp(_FLIGHT_NUMBER_RE, message="Expected 2 letters + 3-4 digits, e.g. MZ001, BB800"),
+        ],
         filters=[lambda v: v.strip().upper() if v else v],
     )
 
@@ -93,23 +108,34 @@ class InventoryAvailabilityForm(FlaskForm):
 
     Boarding_Point = StringField(
         "Boarding Point",
-        validators=[DataRequired(), Length(min=3, max=3)],
+        validators=[
+            DataRequired(),
+            Length(min=3, max=3),
+            Regexp(_CITY_CODE_RE, message="Expected exactly 3 uppercase letters, e.g. CGK"),
+        ],
         filters=[lambda v: v.strip().upper() if v else v],
     )
 
     Off_Point = StringField(
         "Off Point",
-        validators=[DataRequired(), Length(min=3, max=3)],
+        validators=[
+            DataRequired(),
+            Length(min=3, max=3),
+            Regexp(_CITY_CODE_RE, message="Expected exactly 3 uppercase letters, e.g. SIN"),
+        ],
         filters=[lambda v: v.strip().upper() if v else v],
     )
 
     RBD_Class = StringField(
         "RBD Class (1 letter)",
-        validators=[DataRequired(), Length(min=1, max=1)],
+        validators=[
+            DataRequired(),
+            Length(min=1, max=1),
+            Regexp(_RBD_CLASS_RE, message="Expected a single uppercase letter, e.g. Y, J, M"),
+        ],
         filters=[lambda v: v.strip().upper() if v else v],
     )
 
-    # choices populated in the route, since it depends on loader.py data
     Segment_Status_Code = SelectField(
         "Segment Status Code",
         validators=[Optional()],
@@ -122,30 +148,52 @@ class InventoryAvailabilityForm(FlaskForm):
         filters=[lambda v: v.strip().upper() if v else v],
     )
 
+    def validate_Numeric_Availability(self, field):
+        if field.data and not loader.is_valid_numeric_availability(field.data):
+            raise ValidationError(
+                "Expected format A0-A9 or L0-L9, e.g. A5, L6"
+            )
+
 _POS_USER_TYPE_RE = re.compile(r"^[A-Z]$")
 
 class PnrForm(FlaskForm):
     PNR_Code = StringField(
         "PNR Code",
-        validators=[DataRequired(), Length(max=10)],
+        validators=[
+            DataRequired(),
+            Length(max=10),
+            Regexp(_PNR_CODE_RE, message="Expected 5-10 uppercase letters/digits, e.g. YQHNBA"),
+        ],
         filters=[lambda v: v.strip().upper() if v else v],
     )
 
     Booking_Office_Code = StringField(
         "Booking Office Code",
-        validators=[DataRequired(), Length(max=10)],
+        validators=[
+            DataRequired(),
+            Length(max=10),
+            Regexp(_BOOKING_OFFICE_RE, message="Expected 3-10 uppercase letters/digits, e.g. JKTBA"),
+        ],
         filters=[lambda v: v.strip().upper() if v else v],
     )
 
     POS_Travel_Agent_ID = StringField(
         "POS Travel Agent ID",
-        validators=[Optional(), Length(max=20)],
+        validators=[
+            Optional(),
+            Length(max=20),
+            Regexp(_TRAVEL_AGENT_ID_RE, message="Expected digits only, e.g. 12345678"),
+        ],
         filters=[lambda v: v.strip() if v else v],
     )
 
     POS_City_Code = StringField(
         "POS City Code",
-        validators=[Optional(), Length(min=3, max=3)],
+        validators=[
+            Optional(),
+            Length(min=3, max=3),
+            Regexp(_CITY_CODE_RE, message="Expected exactly 3 uppercase letters, e.g. JKT"),
+        ],
         filters=[lambda v: v.strip().upper() if v else v],
     )
 
@@ -158,6 +206,7 @@ class PnrForm(FlaskForm):
         ],
         filters=[lambda v: v.strip().upper() if v else v],
     )
+
 
 _TITLE_RE = re.compile(r"^[A-Z]{2,4}$")
 
@@ -209,13 +258,21 @@ class FlightSegmentForm(FlaskForm):
 
     Flight_Number = StringField(
         "Flight Number",
-        validators=[DataRequired(), Length(max=10)],
+        validators=[
+            DataRequired(),
+            Length(max=10),
+            Regexp(_FLIGHT_NUMBER_RE, message="Expected 2 letters + 3-4 digits, e.g. KL0237, BA0123"),
+        ],
         filters=[lambda v: v.strip().upper() if v else v],
     )
 
     RBD_Class = StringField(
         "RBD Class",
-        validators=[Optional(), Length(min=1, max=1)],
+        validators=[
+            Optional(),
+            Length(min=1, max=1),
+            Regexp(_RBD_CLASS_RE, message="Expected a single uppercase letter, e.g. F, Y"),
+        ],
         filters=[lambda v: v.strip().upper() if v else v],
     )
 
@@ -227,13 +284,21 @@ class FlightSegmentForm(FlaskForm):
 
     Boarding_Point = StringField(
         "Boarding Point",
-        validators=[DataRequired(), Length(min=3, max=3)],
+        validators=[
+            DataRequired(),
+            Length(min=3, max=3),
+            Regexp(_CITY_CODE_RE, message="Expected exactly 3 uppercase letters, e.g. CGK"),
+        ],
         filters=[lambda v: v.strip().upper() if v else v],
     )
 
     Off_Point = StringField(
         "Off Point",
-        validators=[DataRequired(), Length(min=3, max=3)],
+        validators=[
+            DataRequired(),
+            Length(min=3, max=3),
+            Regexp(_CITY_CODE_RE, message="Expected exactly 3 uppercase letters, e.g. DPS"),
+        ],
         filters=[lambda v: v.strip().upper() if v else v],
     )
 
@@ -306,7 +371,11 @@ class SsrForm(FlaskForm):
 
     SSR_Code = StringField(
         "SSR Code",
-        validators=[DataRequired(), Length(min=4, max=4)],
+        validators=[
+            DataRequired(),
+            Length(min=4, max=4),
+            Regexp(_SSR_CODE_RE, message="Expected exactly 4 uppercase letters, e.g. VGML, NSST"),
+        ],
         filters=[lambda v: v.strip().upper() if v else v],
     )
 

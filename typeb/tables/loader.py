@@ -186,6 +186,9 @@ def match_numeric_availability_code(code: str) -> dict[str, Any] | None:
         ),
     }
 
+def is_valid_numeric_availability(code: str) -> bool:
+    return match_numeric_availability_code(code) is not None
+
 
 def load_all() -> dict[str, dict[str, CodeEntry]]:
     """Load + validate every table. Call this once at app startup so a

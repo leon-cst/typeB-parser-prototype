@@ -58,6 +58,39 @@
                         </div>
                     </div>
 
+                    <div class="mb-3 row">
+                        <label class="col-md-3 col-form-label">Passenger Type</label>
+                        <div class="col-md-9">
+                            {{ form.Passenger_Type(class="form-control" + (" is-invalid" if form.Passenger_Type.errors else "")) }}
+                            {% for error in form.Passenger_Type.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                            <div class="form-text">e.g. ADT, CHD, INF</div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3 row">
+                        <label class="col-md-3 col-form-label">Email</label>
+                        <div class="col-md-9">
+                            {{ form.Email(class="form-control" + (" is-invalid" if form.Email.errors else "")) }}
+                            {% for error in form.Email.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="mb-3 row">
+                        <label class="col-md-3 col-form-label">Date of Birth</label>
+                        <div class="col-md-9">
+                            {{ form.Date_Of_Birth_Raw(class="form-control" + (" is-invalid" if form.Date_Of_Birth_Raw.errors else ""), placeholder="ddMMMyy") }}
+                            {% for error in form.Date_Of_Birth_Raw.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="mb-3 row">
+                        <label class="col-md-3 col-form-label">FOID</label>
+                        <div class="col-md-9">
+                            {{ form.Foid(class="form-control" + (" is-invalid" if form.Foid.errors else "")) }}
+                            {% for error in form.Foid.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                        </div>
+                    </div>
+
                     <div class="row">
                         <div class="col-md-9 offset-md-3">
                             <button type="submit" class="btn btn-primary">

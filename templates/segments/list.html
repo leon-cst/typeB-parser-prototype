@@ -23,10 +23,12 @@
                             <tr>
                                 <th>ID</th>
                                 <th>PNR</th>
+                                <th>Airline</th>
                                 <th>Flight</th>
                                 <th>Class</th>
                                 <th>Date</th>
                                 <th>Route</th>
+                                <th>Party</th>
                                 <th>Action</th>
                                 <th>Dep / Arr</th>
                                 <th>Actions</th>
@@ -37,10 +39,12 @@
                             <tr>
                                 <td>{{ s.Segment_ID }}</td>
                                 <td><code>{{ s.pnr.PNR_Code }}</code></td>
+                                <td>{{ s.Airline_Code or "—" }}</td>
                                 <td>{{ s.Flight_Number }}</td>
                                 <td>{{ s.RBD_Class or "—" }}</td>
-                                <td>{{ s.Flight_Date.strftime("%Y-%m-%d") }}</td>
+                                <td>{{ s.Flight_Date.strftime("%Y-%m-%d") if s.Flight_Date else (s.Flight_Date_Raw or "—") }}</td>
                                 <td>{{ s.Boarding_Point }}–{{ s.Off_Point }}</td>
+                                <td>{{ s.Number_In_Party or "—" }}</td>
                                 <td>{{ s.Action_Code or "—" }}</td>
                                 <td>
                                     {{ s.Departure_Time.strftime("%H:%M") if s.Departure_Time else "—" }}
@@ -63,7 +67,7 @@
                             </tr>
                             {% else %}
                             <tr>
-                                <td colspan="9" class="text-center text-muted">No flight segments yet.</td>
+                                <td colspan="11" class="text-center text-muted">No flight segments yet.</td>
                             </tr>
                             {% endfor %}
                         </tbody>

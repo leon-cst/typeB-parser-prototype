@@ -179,12 +179,8 @@ class PnrForm(FlaskForm):
 
     POS_Travel_Agent_ID = StringField(
         "POS Travel Agent ID",
-        validators=[
-            Optional(),
-            Length(max=20),
-            Regexp(_TRAVEL_AGENT_ID_RE, message="Expected digits only, e.g. 12345678"),
-        ],
-        filters=[lambda v: v.strip() if v else v],
+        validators=[Optional(), Length(max=20)],
+        filters=[lambda v: v.strip().upper() if v else v],
     )
 
     POS_City_Code = StringField(
@@ -215,7 +211,7 @@ class PassengerForm(FlaskForm):
         "PNR",
         validators=[DataRequired()],
         coerce=int,
-        choices=[],  # populated in the route from real PNR rows
+        choices=[],
     )
 
     Family_Name = StringField(
@@ -246,7 +242,31 @@ class PassengerForm(FlaskForm):
         filters=[lambda v: v.strip() if v else v],
     )
 
+    Passenger_Type = StringField(
+        "Passenger Type",
+        validators=[Optional(), Length(max=5)],
+        filters=[lambda v: v.strip().upper() if v else v],
+    )
 
+    Email = StringField(
+        "Email",
+        validators=[Optional(), Length(max=255)],
+        filters=[lambda v: v.strip().upper() if v else v],
+    )
+
+    Date_Of_Birth_Raw = StringField(
+        "Date of Birth (ddMMMyy)",
+        validators=[Optional(), Length(max=10)],
+        filters=[lambda v: v.strip().upper() if v else v],
+    )
+
+    Foid = StringField(
+        "FOID",
+        validators=[Optional(), Length(max=50)],
+        filters=[lambda v: v.strip().upper() if v else v],
+    )
+
+_AIRLINE_CODE_RE = re.compile(r"^[A-Z0-9]{2,3}$")
 
 class FlightSegmentForm(FlaskForm):
     PNR_ID = SelectField(
@@ -254,6 +274,16 @@ class FlightSegmentForm(FlaskForm):
         validators=[DataRequired()],
         coerce=int,
         choices=[],
+    )
+
+    Airline_Code = StringField(
+        "Airline Code",
+        validators=[
+            Optional(),
+            Length(min=2, max=3),
+            Regexp(_AIRLINE_CODE_RE, message="Expected 2-3 uppercase letters/digits, e.g. 8G"),
+        ],
+        filters=[lambda v: v.strip().upper() if v else v],
     )
 
     Flight_Number = StringField(
@@ -305,7 +335,13 @@ class FlightSegmentForm(FlaskForm):
     Action_Code = SelectField(
         "Action Code",
         validators=[Optional()],
-        choices=[],  # populated in the route from segment_status_codes.yaml
+        choices=[],
+    )
+
+    Number_In_Party = StringField(
+        "Number in Party",
+        validators=[Optional()],
+        filters=[lambda v: v.strip() if v else v],
     )
 
     Departure_Time = StringField(
@@ -320,7 +356,6 @@ class FlightSegmentForm(FlaskForm):
         filters=[lambda v: v.strip() if v else v],
     )
 
-_AIRLINE_CODE_RE = re.compile(r"^[A-Z]{2}$")
 
 class OsiForm(FlaskForm):
     PNR_ID = SelectField(

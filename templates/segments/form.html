@@ -27,6 +27,14 @@
                     </div>
 
                     <div class="mb-3 row">
+                        <label class="col-md-3 col-form-label">Airline Code</label>
+                        <div class="col-md-9">
+                            {{ form.Airline_Code(class="form-control" + (" is-invalid" if form.Airline_Code.errors else ""), maxlength=3) }}
+                            {% for error in form.Airline_Code.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="mb-3 row">
                         <label class="col-md-3 col-form-label">Flight Number</label>
                         <div class="col-md-9">
                             {{ form.Flight_Number(class="form-control" + (" is-invalid" if form.Flight_Number.errors else "")) }}
@@ -70,6 +78,14 @@
                         <label class="col-md-3 col-form-label">Action Code</label>
                         <div class="col-md-9">
                             {{ form.Action_Code(class="form-select") }}
+                        </div>
+                    </div>
+
+                    <div class="mb-3 row">
+                        <label class="col-md-3 col-form-label">Number in Party</label>
+                        <div class="col-md-9">
+                            {{ form.Number_In_Party(class="form-control" + (" is-invalid" if form.Number_In_Party.errors else "")) }}
+                            {% for error in form.Number_In_Party.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
                         </div>
                     </div>
 

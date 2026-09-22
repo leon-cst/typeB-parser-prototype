@@ -104,7 +104,6 @@ class Passenger(db.Model):
 
     Passenger_ID = db.Column(db.Integer, primary_key=True, autoincrement=True)
 
-    # FKs PNR_ID, not PNR_Code -- PNR_Code isn't unique (see Pnr model).
     PNR_ID = db.Column(
         db.Integer,
         db.ForeignKey("PNR.PNR_ID", ondelete="CASCADE", onupdate="CASCADE"),
@@ -115,6 +114,11 @@ class Passenger(db.Model):
     First_Name_Middle_Name = db.Column(db.String(100), nullable=True)
     Title = db.Column(db.String(10), nullable=True)
     Number_In_Party = db.Column(db.Integer, nullable=True)
+
+    Passenger_Type = db.Column(db.String(5), nullable=True)
+    Email = db.Column(db.String(255), nullable=True)
+    Date_Of_Birth_Raw = db.Column(db.String(10), nullable=True)
+    Foid = db.Column(db.String(50), nullable=True)
 
     pnr = db.relationship("Pnr", backref=db.backref("passengers", cascade="all, delete-orphan"))
 
@@ -133,21 +137,26 @@ class FlightSegment(db.Model):
         nullable=False,
     )
 
+    Airline_Code = db.Column(db.String(3), nullable=True)
     Flight_Number = db.Column(db.String(10), nullable=False)
     RBD_Class = db.Column(db.String(1), nullable=True)
-    Flight_Date = db.Column(db.Date, nullable=False)
+    Flight_Date = db.Column(db.Date, nullable=True)  # nullable now -- see Flight_Date_Raw
+    Flight_Date_Raw = db.Column(db.String(7), nullable=True)  # ddMMM, true source (no year)
     Boarding_Point = db.Column(db.String(3), nullable=False)
     Off_Point = db.Column(db.String(3), nullable=False)
     Action_Code = db.Column(db.String(2), nullable=True)
+    Number_In_Party = db.Column(db.Integer, nullable=True)
     Departure_Time = db.Column(db.Time, nullable=True)
     Arrival_Time = db.Column(db.Time, nullable=True)
+    Arrival_Day_Offset = db.Column(db.SmallInteger, nullable=True)
 
     pnr = db.relationship("Pnr", backref=db.backref("flight_segments", cascade="all, delete-orphan"))
 
     def __repr__(self) -> str:
         return (
             f"<FlightSegment {self.Segment_ID} {self.Flight_Number} "
-            f"{self.Flight_Date} {self.Boarding_Point}-{self.Off_Point}>"
+            f"{self.Flight_Date_Raw or self.Flight_Date} "
+            f"{self.Boarding_Point}-{self.Off_Point}>"
         )
 
 

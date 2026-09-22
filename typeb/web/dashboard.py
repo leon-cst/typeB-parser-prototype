@@ -322,6 +322,10 @@ def new_passenger():
             First_Name_Middle_Name=form.First_Name_Middle_Name.data or None,
             Title=form.Title.data or None,
             Number_In_Party=number_in_party,
+            Passenger_Type=form.Passenger_Type.data or None,
+            Email=form.Email.data or None,
+            Date_Of_Birth_Raw=form.Date_Of_Birth_Raw.data or None,
+            Foid=form.Foid.data or None,
         )
         db.session.add(passenger)
         db.session.commit()
@@ -337,7 +341,10 @@ def edit_passenger(passenger_id):
     if passenger is None:
         abort(404)
 
-    form = PassengerForm(obj=passenger)
+    form = PassengerForm(
+        obj=passenger,
+        Number_In_Party=str(passenger.Number_In_Party) if passenger.Number_In_Party else "",
+    )
     form.PNR_ID.choices = _pnr_choices()
 
     if form.validate_on_submit():
@@ -349,13 +356,17 @@ def edit_passenger(passenger_id):
                     raise ValueError
             except ValueError:
                 form.Number_In_Party.errors.append("Must be a positive whole number.")
-                return render_template("passengers/form.html", form=form, passenger=None)
+                return render_template("passengers/form.html", form=form, passenger=passenger)
 
         passenger.PNR_ID = form.PNR_ID.data
         passenger.Family_Name = form.Family_Name.data
         passenger.First_Name_Middle_Name = form.First_Name_Middle_Name.data or None
         passenger.Title = form.Title.data or None
         passenger.Number_In_Party = number_in_party
+        passenger.Passenger_Type = form.Passenger_Type.data or None
+        passenger.Email = form.Email.data or None
+        passenger.Date_Of_Birth_Raw = form.Date_Of_Birth_Raw.data or None
+        passenger.Foid = form.Foid.data or None
         db.session.commit()
         flash(f"Passenger {passenger.Family_Name} updated.", "success")
         return redirect(url_for("dashboard.list_passengers"))
@@ -411,14 +422,27 @@ def new_segment():
             form.Departure_Time.errors.append("Expected format HH:MM.")
             return render_template("segments/form.html", form=form, segment=None)
 
+        number_in_party = None
+        if form.Number_In_Party.data:
+            try:
+                number_in_party = int(form.Number_In_Party.data)
+                if number_in_party < 1:
+                    raise ValueError
+            except ValueError:
+                form.Number_In_Party.errors.append("Must be a positive whole number.")
+                return render_template("segments/form.html", form=form, segment=None)
+
         segment = FlightSegment(
             PNR_ID=form.PNR_ID.data,
+            Airline_Code=form.Airline_Code.data or None,
             Flight_Number=form.Flight_Number.data,
             RBD_Class=form.RBD_Class.data or None,
             Flight_Date=flight_date,
+            Flight_Date_Raw=None,  # only set by the parser mapper, not manual entry
             Boarding_Point=form.Boarding_Point.data,
             Off_Point=form.Off_Point.data,
             Action_Code=form.Action_Code.data or None,
+            Number_In_Party=number_in_party,
             Departure_Time=departure_time,
             Arrival_Time=arrival_time,
         )
@@ -438,9 +462,10 @@ def edit_segment(segment_id):
 
     form = FlightSegmentForm(
         obj=segment,
-        Flight_Date=segment.Flight_Date.isoformat(),
+        Flight_Date=segment.Flight_Date.isoformat() if segment.Flight_Date else "",
         Departure_Time=segment.Departure_Time.isoformat(timespec="minutes") if segment.Departure_Time else "",
         Arrival_Time=segment.Arrival_Time.isoformat(timespec="minutes") if segment.Arrival_Time else "",
+        Number_In_Party=str(segment.Number_In_Party) if segment.Number_In_Party else "",
     )
     form.PNR_ID.choices = _pnr_choices()
     form.Action_Code.choices = _segment_status_choices()
@@ -459,13 +484,25 @@ def edit_segment(segment_id):
             form.Departure_Time.errors.append("Expected format HH:MM.")
             return render_template("segments/form.html", form=form, segment=segment)
 
+        number_in_party = None
+        if form.Number_In_Party.data:
+            try:
+                number_in_party = int(form.Number_In_Party.data)
+                if number_in_party < 1:
+                    raise ValueError
+            except ValueError:
+                form.Number_In_Party.errors.append("Must be a positive whole number.")
+                return render_template("segments/form.html", form=form, segment=segment)
+
         segment.PNR_ID = form.PNR_ID.data
+        segment.Airline_Code = form.Airline_Code.data or None
         segment.Flight_Number = form.Flight_Number.data
         segment.RBD_Class = form.RBD_Class.data or None
         segment.Flight_Date = flight_date
         segment.Boarding_Point = form.Boarding_Point.data
         segment.Off_Point = form.Off_Point.data
         segment.Action_Code = form.Action_Code.data or None
+        segment.Number_In_Party = number_in_party
         segment.Departure_Time = departure_time
         segment.Arrival_Time = arrival_time
         db.session.commit()

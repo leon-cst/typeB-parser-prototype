@@ -26,6 +26,8 @@
                                 <th>Family Name</th>
                                 <th>First/Middle Name</th>
                                 <th>Title</th>
+                                <th>Type</th>
+                                <th>Email</th>
                                 <th>Party Size</th>
                                 <th>Actions</th>
                             </tr>
@@ -38,6 +40,8 @@
                                 <td>{{ p.Family_Name }}</td>
                                 <td>{{ p.First_Name_Middle_Name or "—" }}</td>
                                 <td>{{ p.Title or "—" }}</td>
+                                <td>{{ p.Passenger_Type or "—" }}</td>
+                                <td>{{ p.Email or "—" }}</td>
                                 <td>{{ p.Number_In_Party or "—" }}</td>
                                 <td>
                                     <a href="{{ url_for('dashboard.edit_passenger', passenger_id=p.Passenger_ID) }}"
@@ -55,7 +59,7 @@
                             </tr>
                             {% else %}
                             <tr>
-                                <td colspan="7" class="text-center text-muted">No passengers yet.</td>
+                                <td colspan="9" class="text-center text-muted">No passengers yet.</td>
                             </tr>
                             {% endfor %}
                         </tbody>

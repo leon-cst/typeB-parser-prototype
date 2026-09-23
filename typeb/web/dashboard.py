@@ -2,13 +2,19 @@
 Agreement Table CRUD GUI.
 
 """
-from flask import Blueprint, abort, flash, redirect, render_template, url_for
+from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 
 from typeb.extensions import db
 from typeb.db.models import Agreement, MessageIdentifier, InventoryAvailability, Pnr, Passenger, FlightSegment, Osi, Ssr
 from typeb.web.forms import AgreementForm, MessageIdentifierForm, InventoryAvailabilityForm, PnrForm, PassengerForm, FlightSegmentForm, OsiForm, SsrForm
 from typeb.tables import loader
 from datetime import date
+
+from typeb.elements.cross_reference import CrossReferenceError
+from typeb.elements.errors import ElementParseError
+from typeb.envelope.parser import EnvelopeParseError
+from typeb.messages.booking import parse_booking_message
+from typeb.persistence.booking import analyze_booking_message, save_booking_message
 
 dashboard_bp = Blueprint("dashboard", __name__, url_prefix="/agreements")
 
@@ -684,3 +690,62 @@ def delete_ssr(ssr_id):
     db.session.commit()
     flash(f"SSR entry {entry.SSR_Code} deleted.", "success")
     return redirect(url_for("dashboard.list_ssr"))
+
+
+# Preview
+
+@dashboard_bp.route("/parse-preview", methods=["GET", "POST"])
+def parse_preview():
+    if request.method == "GET":
+        return render_template("parse_preview/form.html")
+
+    raw = request.form.get("raw_message", "")
+    if not raw.strip():
+        flash("Paste a Type B message first.", "danger")
+        return render_template("parse_preview/form.html", raw_message=raw)
+
+    try:
+        message = parse_booking_message(raw)
+    except (EnvelopeParseError, ElementParseError, CrossReferenceError) as e:
+        flash(f"Could not parse this message: {e}", "danger")
+        return render_template("parse_preview/form.html", raw_message=raw)
+
+    plan = analyze_booking_message(message)
+
+    duplicate_pnrs = []
+    for pp in plan.pnrs:
+        existing = Pnr.query.filter_by(PNR_Code=pp.pnr_code).first()
+        if existing is not None:
+            duplicate_pnrs.append((pp.pnr_code, existing.PNR_ID))
+
+    return render_template(
+        "parse_preview/review.html",
+        raw_message=raw,
+        plan=plan,
+        duplicate_pnrs=duplicate_pnrs,
+    )
+
+
+@dashboard_bp.post("/parse-preview/confirm")
+def parse_preview_confirm():
+    raw = request.form.get("raw_message", "")
+    if not raw.strip():
+        flash("Nothing to save -- message was empty.", "danger")
+        return redirect(url_for("dashboard.parse_preview"))
+
+    try:
+        message = parse_booking_message(raw)
+    except (EnvelopeParseError, ElementParseError, CrossReferenceError) as e:
+        flash(f"Could not re-parse this message: {e}", "danger")
+        return redirect(url_for("dashboard.parse_preview"))
+
+    plan = analyze_booking_message(message)
+
+    try:
+        pnr = save_booking_message(plan)
+    except ValueError as e:
+        flash(f"Could not save: {e}", "danger")
+        return redirect(url_for("dashboard.parse_preview"))
+
+    flash(f"Saved PNR {pnr.PNR_Code} and related records.", "success")
+    return redirect(url_for("dashboard.list_pnrs"))

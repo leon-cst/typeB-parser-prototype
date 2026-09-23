@@ -71,7 +71,7 @@
             <div data-simplebar class="h-100">
                 <div id="sidebar-menu">
                     <ul class="metismenu list-unstyled" id="side-menu">
-                        <li class="menu-title">Type B Admin</li>
+                        <li class="menu-title">Tables</li>
 
                         <li>
                             <a href="{{ url_for('dashboard.list_agreements') }}" class="waves-effect">
@@ -126,6 +126,15 @@
                             <a href="{{ url_for('dashboard.list_ssr') }}" class="waves-effect">
                                 <i class="bx bx-list-check"></i>
                                 <span>SSR</span>
+                            </a>
+                        </li>
+
+                        <li class="menu-title">Preview</li>
+
+                        <li>
+                            <a href="{{ url_for('dashboard.parse_preview') }}" class="waves-effect">
+                                <i class="bx bx-scan"></i>
+                                <span>Parse Message</span>
                             </a>
                         </li>
                     </ul>

@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+
+{% block title %}Review Parsed Message{% endblock %}
+{% block page_heading %}Review Parsed Message{% endblock %}
+{% block breadcrumb_current %}Review{% endblock %}
+
+{% block content %}
+
+{% if duplicate_pnrs %}
+<div class="alert alert-warning">
+    <strong>Heads up:</strong> the following PNR code(s) already exist in the database:
+    <ul class="mb-0 mt-2">
+        {% for code, existing_id in duplicate_pnrs %}
+        <li><code>{{ code }}</code> (existing record <a href="{{ url_for('dashboard.edit_pnr', pnr_id=existing_id) }}">#{{ existing_id }}</a>) -- saving will create a new, separate row.</li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
+
+{% if plan.has_unmappable %}
+<div class="alert alert-danger">
+    <strong>Could not be mapped to any table:</strong>
+    <ul class="mb-0 mt-2">
+        {% for item in plan.unmappable %}
+        <li>{{ item }}</li>
+        {% endfor %}
+    </ul>
+    <div class="mt-2">This data will <strong>not</strong> be saved if you proceed.</div>
+</div>
+{% endif %}
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <h4 class="card-title">PNR{{ "s" if plan.pnrs|length != 1 else "" }} ({{ plan.pnrs|length }})</h4>
+                <div class="table-responsive">
+                    <table class="table table-bordered table-sm mb-0">
+                        <thead><tr><th>PNR Code</th><th>Booking Office</th><th>Travel Agent</th><th>City</th><th>User Type</th></tr></thead>
+                        <tbody>
+                            {% for p in plan.pnrs %}
+                            <tr>
+                                <td><code>{{ p.pnr_code }}</code></td>
+                                <td>{{ p.booking_office_code }}</td>
+                                <td>{{ p.pos_travel_agent_id or "—" }}</td>
+                                <td>{{ p.pos_city_code or "—" }}</td>
+                                <td>{{ p.pos_user_type or "—" }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <h4 class="card-title">Passengers ({{ plan.passengers|length }})</h4>
+                <div class="table-responsive">
+                    <table class="table table-bordered table-sm mb-0">
+                        <thead><tr><th>Name</th><th>Title</th><th>Type</th><th>Party</th><th>Email</th><th>DOB</th><th>FOID</th></tr></thead>
+                        <tbody>
+                            {% for p in plan.passengers %}
+                            <tr>
+                                <td>{{ p.family_name }}{% if p.first_name_middle_name %}/{{ p.first_name_middle_name }}{% endif %}</td>
+                                <td>{{ p.title or "—" }}</td>
+                                <td>{{ p.passenger_type }}</td>
+                                <td>{{ p.number_in_party or "—" }}</td>
+                                <td>{{ p.email or "—" }}</td>
+                                <td>{{ p.date_of_birth_raw or "—" }}</td>
+                                <td>{{ p.foid or "—" }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <h4 class="card-title">Flight Segments ({{ plan.segments|length }})</h4>
+                <div class="table-responsive">
+                    <table class="table table-bordered table-sm mb-0">
+                        <thead><tr><th>Flight</th><th>Class</th><th>Date</th><th>Route</th><th>Party</th><th>Action</th><th>Dep / Arr</th></tr></thead>
+                        <tbody>
+                            {% for s in plan.segments %}
+                            <tr>
+                                <td>{{ s.airline_code }}{{ s.flight_number }}</td>
+                                <td>{{ s.rbd_class or "—" }}</td>
+                                <td>{{ s.flight_date_raw }}</td>
+                                <td>{{ s.boarding_point }}–{{ s.off_point }}</td>
+                                <td>{{ s.number_in_party }}</td>
+                                <td>{{ s.action_code }}</td>
+                                <td>
+                                    {{ s.departure_time.strftime("%H:%M") if s.departure_time else "—" }}
+                                    /
+                                    {{ s.arrival_time.strftime("%H:%M") if s.arrival_time else "—" }}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if plan.osi_entries %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <h4 class="card-title">OSI Entries ({{ plan.osi_entries|length }})</h4>
+                <div class="table-responsive">
+                    <table class="table table-bordered table-sm mb-0">
+                        <thead><tr><th>Airline</th><th>Passenger</th><th>Text</th></tr></thead>
+                        <tbody>
+                            {% for o in plan.osi_entries %}
+                            <tr>
+                                <td>{{ o.airline_code }}</td>
+                                <td>{{ plan.passengers[o.passenger_index].family_name if o.passenger_index is not none else "—" }}</td>
+                                <td>{{ o.information_text }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if plan.ssr_entries %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <h4 class="card-title">SSR Entries ({{ plan.ssr_entries|length }})</h4>
+                <div class="table-responsive">
+                    <table class="table table-bordered table-sm mb-0">
+                        <thead><tr><th>Code</th><th>Airline</th><th>Action</th><th>Passenger</th><th>Text</th></tr></thead>
+                        <tbody>
+                            {% for s in plan.ssr_entries %}
+                            <tr>
+                                <td><code>{{ s.ssr_code }}</code></td>
+                                <td>{{ s.airline_code or "—" }}</td>
+                                <td>{{ s.action_code or "—" }}</td>
+                                <td>{{ plan.passengers[s.passenger_index].family_name if s.passenger_index is not none else "—" }}</td>
+                                <td>{{ s.free_text or "—" }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div class="row">
+    <div class="col-12 mb-4">
+        <form method="post" action="{{ url_for('dashboard.parse_preview_confirm') }}">
+            <input type="hidden" name="raw_message" value="{{ raw_message }}">
+            <button type="submit" class="btn btn-success">
+                <i class="bx bx-check me-1"></i> Confirm &amp; Save
+            </button>
+            <a href="{{ url_for('dashboard.parse_preview') }}" class="btn btn-secondary">
+                Start Over
+            </a>
+        </form>
+    </div>
+</div>
+
+{% endblock %}
